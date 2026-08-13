@@ -36,21 +36,29 @@ struct MilestonesView: View {
     @State private var noteText: String = ""
     @State private var milestoneToUncheck: Milestone? = nil
     @State private var showRemoveAlert: Bool = false
+    @State private var showAddMilestone: Bool = false
+    @State private var milestoneToDelete: Milestone? = nil
+    @State private var showDeleteMilestoneAlert: Bool = false
 
     // MARK: - Derived Data
 
     private var correctedAge: Int { max(0, child.calculateCorrectedAge()) }
 
+    // Derived from the standard set only. A parent-authored moment is stamped with
+    // the child's current age, and letting those into this calculation would pull
+    // the stage away from the real milestone bands (6, 9, 12, …).
     private var targetAgeMonth: Int {
-        guard !milestones.isEmpty else { return 6 }
-        let allAges = Set(milestones.map(\.ageMonth))
-        return allAges.min(by: { abs($0 - correctedAge) < abs($1 - correctedAge) }) ?? 6
+        let standardAges = Set(milestones.filter { !$0.isUserCreated }.map(\.ageMonth))
+        guard !standardAges.isEmpty else { return 6 }
+        return standardAges.min(by: { abs($0 - correctedAge) < abs($1 - correctedAge) }) ?? 6
     }
 
     private var filteredMilestones: [Milestone] {
         switch selectedFilter {
         case .thisStage:
-            return milestones.filter { $0.ageMonth == targetAgeMonth }
+            // Their own moments always show — a parent who just added one should
+            // never have to hunt for it behind a filter.
+            return milestones.filter { $0.ageMonth == targetAgeMonth || $0.isUserCreated }
         case .all:
             return milestones
         case .completed:
@@ -100,20 +108,52 @@ struct MilestonesView: View {
         } message: { _ in
             Text("This will delete your saved memory.")
         }
+        .alert("Delete this moment?", isPresented: $showDeleteMilestoneAlert, presenting: milestoneToDelete) { milestone in
+            Button("Cancel", role: .cancel) { milestoneToDelete = nil }
+            Button("Delete", role: .destructive) {
+                modelContext.delete(milestone)
+                childStore.save()
+                milestoneToDelete = nil
+            }
+        } message: { milestone in
+            Text("\"\(milestone.title)\" will be removed permanently.")
+        }
+        .sheet(isPresented: $showAddMilestone) {
+            if let active = childStore.activeChild {
+                AddMilestoneSheet(child: active)
+            }
+        }
     }
 
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Milestones")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(theme.text)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Milestones")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(theme.text)
 
-            Text(ageDescription)
-                .font(.subheadline)
-                .foregroundStyle(theme.textSecondary)
+                // Naming the child here is what stops a parent logging against the
+                // wrong one after switching.
+                Text("\(child.displayName) · \(ageDescription)")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            Spacer()
+
+            Button {
+                showAddMilestone = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(theme.blue)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add a moment")
+            .accessibilityHint("Record your own milestone for \(child.displayName)")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
@@ -259,9 +299,18 @@ struct MilestonesView: View {
                     .foregroundStyle(milestone.isCompleted ? theme.textSecondary : theme.text)
                     .strikethrough(milestone.isCompleted, color: theme.green.opacity(0.8))
 
-                Text(milestone.expectedAgeText)
-                    .font(.caption2)
-                    .foregroundStyle(theme.textSecondary)
+                // A parent-authored moment has no expected age, so it gets a quiet
+                // "Your moment" label instead of a clinical age band. Same row
+                // styling otherwise — these are not a separate kind of thing.
+                if milestone.isUserCreated {
+                    Label("Your moment", systemImage: "heart.fill")
+                        .font(.caption2)
+                        .foregroundStyle(theme.blue.opacity(0.8))
+                } else {
+                    Text(milestone.expectedAgeText)
+                        .font(.caption2)
+                        .foregroundStyle(theme.textSecondary)
+                }
 
                 // Show completion note if present
                 if milestone.isCompleted && !milestone.completionNote.isEmpty {
@@ -295,6 +344,17 @@ struct MilestonesView: View {
                 )
         )
         .accessibilityElement(children: .combine)
+        // Only parent-authored moments can be removed; the standard set is fixed.
+        .contextMenu {
+            if milestone.isUserCreated {
+                Button(role: .destructive) {
+                    milestoneToDelete = milestone
+                    showDeleteMilestoneAlert = true
+                } label: {
+                    Label("Delete Moment", systemImage: "trash")
+                }
+            }
+        }
     }
 
     // MARK: - Empty State

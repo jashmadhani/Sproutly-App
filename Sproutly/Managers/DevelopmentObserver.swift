@@ -84,9 +84,13 @@ struct DevelopmentObserver {
         milestones: [Milestone],
         correctedAge: Int
     ) -> DomainObservation {
-        // milestones up to current age
+        // Milestones up to current age. Parent-authored moments are deliberately
+        // excluded: they carry no clinical expectation, and counting them would
+        // let a parent's own entries skew a domain's status either way.
         let relevant = milestones.filter {
-            $0.category == category.rawValue && $0.ageMonth <= correctedAge
+            !$0.isUserCreated
+                && $0.category == category.rawValue
+                && $0.ageMonth <= correctedAge
         }
         
         let total = relevant.count

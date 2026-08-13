@@ -247,6 +247,40 @@ final class CustomMilestoneTests: XCTestCase {
 
     // Parent-authored moments have no expected age, so they must never be flagged
     // late or scored against a developmental domain.
+    // The design rule: a parent's own entries must not move a domain's status,
+    // in either direction. Otherwise logging six personal language moments would
+    // inflate Communication and mute the signal the observer exists to give.
+    func testUserCreatedMilestonesAreExcludedFromDomainScoring() throws {
+        let standard = [
+            Milestone(title: "Babbles", category: "Language", ageMonth: 6, isCompleted: true),
+            Milestone(title: "Points", category: "Language", ageMonth: 6)
+        ]
+        let baseline = try XCTUnwrap(
+            DevelopmentObserver.observe(milestones: standard, correctedAge: 9)
+                .first { $0.category == .language }
+        )
+
+        // Three completed personal moments in the same domain.
+        let withCustom = standard + (1...3).map {
+            Milestone(
+                title: "Moment \($0)",
+                category: "Language",
+                ageMonth: 6,
+                isCompleted: true,
+                isUserCreated: true
+            )
+        }
+        let observed = try XCTUnwrap(
+            DevelopmentObserver.observe(milestones: withCustom, correctedAge: 9)
+                .first { $0.category == .language }
+        )
+
+        XCTAssertEqual(observed.total, baseline.total)
+        XCTAssertEqual(observed.completed, baseline.completed)
+        XCTAssertEqual(observed.ratio, baseline.ratio, accuracy: 0.0001)
+        XCTAssertEqual(observed.status, baseline.status)
+    }
+
     func testUserCreatedMilestoneIsNeverLate() {
         let custom = Milestone(
             title: "First swim",
