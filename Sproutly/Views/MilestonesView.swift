@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 // MARK: - Filter Mode
 
@@ -37,6 +38,7 @@ struct MilestonesView: View {
     @State private var milestoneToUncheck: Milestone? = nil
     @State private var showRemoveAlert: Bool = false
     @State private var showAddMilestone: Bool = false
+    @State private var pendingPhotoData: Data? = nil
     @State private var milestoneToDelete: Milestone? = nil
     @State private var showDeleteMilestoneAlert: Bool = false
 
@@ -102,15 +104,18 @@ struct MilestonesView: View {
                 milestone.isCompleted = false
                 milestone.dateCompleted = nil
                 milestone.completionNote = ""
+                PhotoStore.delete(milestone.photoFilename)
+                milestone.photoFilename = nil
                 saveContext()
                 milestoneToUncheck = nil
             }
         } message: { _ in
-            Text("This will delete your saved memory.")
+            Text("This will delete your saved memory, including any photo.")
         }
         .alert("Delete this moment?", isPresented: $showDeleteMilestoneAlert, presenting: milestoneToDelete) { milestone in
             Button("Cancel", role: .cancel) { milestoneToDelete = nil }
             Button("Delete", role: .destructive) {
+                PhotoStore.delete(milestone.photoFilename)
                 modelContext.delete(milestone)
                 childStore.save()
                 milestoneToDelete = nil
@@ -293,6 +298,15 @@ struct MilestonesView: View {
 
     private func milestoneRow(_ milestone: Milestone) -> some View {
         HStack(spacing: 12) {
+            if let image = PhotoStore.image(named: milestone.photoFilename) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(milestone.title)
                     .font(.subheadline)
@@ -418,13 +432,19 @@ struct MilestonesView: View {
                     )
             }
 
+            // Photo — offered, never required. The one-tap log stays one tap;
+            // this sheet is already open, so nothing new interrupts the flow.
+            MilestonePhotoPicker(
+                imageData: $pendingPhotoData,
+                nightMode: theme.isNightMode
+            )
+
             // Buttons
             HStack(spacing: 14) {
                 Button {
                     // Skip — complete without note
                     commitToggle(milestone, note: "")
-                    milestoneForNote = nil
-                    noteText = ""
+                    resetSheetState()
                 } label: {
                     Text("Skip")
                         .font(.subheadline.weight(.medium))
@@ -440,9 +460,12 @@ struct MilestonesView: View {
 
                 Button {
                     // Save with note
+                    if let data = pendingPhotoData, let filename = PhotoStore.save(data) {
+                        PhotoStore.delete(milestone.photoFilename)
+                        milestone.photoFilename = filename
+                    }
                     commitToggle(milestone, note: noteText.trimmingCharacters(in: .whitespacesAndNewlines))
-                    milestoneForNote = nil
-                    noteText = ""
+                    resetSheetState()
                 } label: {
                     Text("Save Memory")
                         .font(.subheadline.weight(.semibold))
@@ -464,6 +487,12 @@ struct MilestonesView: View {
     // MARK: - Actions
 
     // marking → show note sheet, unmarking → toggle immediately
+    private func resetSheetState() {
+        milestoneForNote = nil
+        noteText = ""
+        pendingPhotoData = nil
+    }
+
     private func handleToggle(_ milestone: Milestone) {
         if milestone.isCompleted {
             if !milestone.completionNote.isEmpty {

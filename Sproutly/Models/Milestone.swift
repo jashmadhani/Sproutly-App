@@ -42,6 +42,9 @@ final class Milestone: Identifiable {
     // they are excluded from timing status and from domain scoring.
     var isUserCreated: Bool = false
 
+    // Filename only — the image itself lives in the app container. See PhotoStore.
+    var photoFilename: String?
+
     // MARK: - Initializer
 
     init(
@@ -54,7 +57,8 @@ final class Milestone: Identifiable {
         tips: String = "",
         completionNote: String = "",
         child: Child? = nil,
-        isUserCreated: Bool = false
+        isUserCreated: Bool = false,
+        photoFilename: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -66,10 +70,13 @@ final class Milestone: Identifiable {
         self.completionNote = completionNote
         self.child = child
         self.isUserCreated = isUserCreated
+        self.photoFilename = photoFilename
     }
     
     // MARK: - Computed
     
+    var hasPhoto: Bool { photoFilename != nil }
+
     var categoryType: MilestoneCategory {
         MilestoneCategory(rawValue: category) ?? .grossMotor
     }

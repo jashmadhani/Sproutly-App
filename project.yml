@@ -45,6 +45,12 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
 
+        # Required before any photo access. Missing it is a launch-time crash and
+        # an App Review rejection. PhotosPicker itself is out-of-process and does
+        # not strictly require it, but the string must exist the moment any code
+        # path touches the library.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Sproutly lets you attach a photo to a milestone. Your photos stay on this device and are never uploaded."
+
   SproutlyTests:
     type: bundle.unit-test
     platform: iOS

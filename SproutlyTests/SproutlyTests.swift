@@ -296,3 +296,46 @@ final class CustomMilestoneTests: XCTestCase {
         XCTAssertEqual(custom.getTimingStatus(childAgeMonths: 48), .celebrated)
     }
 }
+
+// MARK: - Photos
+
+final class PhotoStoreTests: XCTestCase {
+
+    private func makeImageData(width: Int, height: Int) -> Data {
+        let size = CGSize(width: width, height: height)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        return image.jpegData(compressionQuality: 1)!
+    }
+
+    func testSaveRoundTripsAndDeleteRemovesFile() throws {
+        let filename = try XCTUnwrap(PhotoStore.save(makeImageData(width: 400, height: 300)))
+        addTeardownBlock { PhotoStore.delete(filename) }
+
+        let loaded = try XCTUnwrap(PhotoStore.image(named: filename))
+        XCTAssertEqual(loaded.size.width, 400, accuracy: 1)
+
+        PhotoStore.delete(filename)
+        XCTAssertNil(PhotoStore.image(named: filename))
+    }
+
+    // Storing originals would waste hundreds of MB over a few years of milestones.
+    func testOversizeImagesAreDownscaled() throws {
+        let filename = try XCTUnwrap(PhotoStore.save(makeImageData(width: 4000, height: 3000)))
+        addTeardownBlock { PhotoStore.delete(filename) }
+
+        let loaded = try XCTUnwrap(PhotoStore.image(named: filename))
+        XCTAssertEqual(max(loaded.size.width, loaded.size.height), 1600, accuracy: 1)
+        // Aspect ratio preserved.
+        XCTAssertEqual(loaded.size.width / loaded.size.height, 4.0 / 3.0, accuracy: 0.01)
+    }
+
+    func testDeletingNilFilenameIsSafe() {
+        PhotoStore.delete(nil)
+        XCTAssertNil(PhotoStore.image(named: nil))
+    }
+}
