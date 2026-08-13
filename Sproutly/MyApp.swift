@@ -13,16 +13,41 @@ import SwiftData
 
 @MainActor
 let sharedAppContainer: ModelContainer = {
+    let schema = Schema(versionedSchema: SproutlySchemaV1.self)
+
+    // A named ModelConfiguration resolves to Library/Application Support/SproutlyDB.store,
+    // but that directory does not exist in a freshly installed container and SwiftData
+    // will not create it. Without this, the very first launch throws and the app dies
+    // before rendering anything — a black screen.
+    if let appSupport = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+        try? FileManager.default.createDirectory(
+            at: appSupport,
+            withIntermediateDirectories: true
+        )
+    }
+
+    let config = ModelConfiguration("SproutlyDB", schema: schema, isStoredInMemoryOnly: false)
+
     do {
-        let schema = Schema(versionedSchema: SproutlySchemaV1.self)
-        let config = ModelConfiguration("SproutlyDB", schema: schema, isStoredInMemoryOnly: false)
-        let container = try ModelContainer(for: schema, migrationPlan: SproutlyMigrationPlan.self, configurations: [config])
-
+        let container = try ModelContainer(
+            for: schema,
+            migrationPlan: SproutlyMigrationPlan.self,
+            configurations: [config]
+        )
         DataSeeder.seedIfNeeded(modelContext: container.mainContext)
-
         return container
     } catch {
-        fatalError("Failed to build app container: \(error)")
+        // Never black-screen a parent who just opened the app. If the on-disk store is
+        // unusable, fall back to an in-memory one so the UI still runs this session.
+        print("⚠️ Sproutly: on-disk store unavailable, using in-memory — \(error)")
+
+        let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        guard let container = try? ModelContainer(for: schema, configurations: [fallback]) else {
+            fatalError("Failed to build even an in-memory container: \(error)")
+        }
+        DataSeeder.seedIfNeeded(modelContext: container.mainContext)
+        return container
     }
 }()
 

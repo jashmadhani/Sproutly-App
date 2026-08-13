@@ -43,17 +43,28 @@ final class DevelopmentObserverTests: XCTestCase {
         XCTAssertEqual(grossMotor.status, .onTrack)
     }
 
-    func testLanguageWeightMakesHalfCompletionEmerging() {
-        let milestones = [
-            Milestone(title: "First word", category: "Language", ageMonth: 9, isCompleted: true),
-            Milestone(title: "Two words", category: "Language", ageMonth: 9)
-        ]
+    // Language carries a 1.2x focus weight, so the same completion ratio lands one
+    // band lower than it would in any other domain.
+    func testLanguageWeightIsStricterThanOtherDomainsAtSameRatio() throws {
+        func observation(for category: MilestoneCategory) throws -> DomainObservation {
+            let milestones = [
+                Milestone(title: "Done", category: category.rawValue, ageMonth: 9, isCompleted: true),
+                Milestone(title: "Not yet", category: category.rawValue, ageMonth: 9)
+            ]
+            let observations = DevelopmentObserver.observe(milestones: milestones, correctedAge: 9)
+            return try XCTUnwrap(observations.first { $0.category == category })
+        }
 
-        let language = DevelopmentObserver.observe(milestones: milestones, correctedAge: 9)
-            .first { $0.category == .language }!
+        let language = try observation(for: .language)
+        let cognitive = try observation(for: .cognitive)
 
+        // Identical raw ratios...
         XCTAssertEqual(language.ratio, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(language.status, .emerging)
+        XCTAssertEqual(cognitive.ratio, 0.5, accuracy: 0.0001)
+
+        // ...but the weighting pushes language down a band (0.5 / 1.2 = 0.417).
+        XCTAssertEqual(cognitive.status, .emerging)
+        XCTAssertEqual(language.status, .needsSupport)
     }
 }
 
