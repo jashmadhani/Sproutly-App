@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import PDFKit
 @testable import Sproutly
 
 final class MilestoneTests: XCTestCase {
@@ -337,5 +338,105 @@ final class PhotoStoreTests: XCTestCase {
     func testDeletingNilFilenameIsSafe() {
         PhotoStore.delete(nil)
         XCTAssertNil(PhotoStore.image(named: nil))
+    }
+}
+
+// MARK: - Report & sharing
+
+@MainActor
+final class ReportTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeChild(ageMonths: Int) throws -> Child {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let birth = Calendar.current.date(byAdding: .month, value: -ageMonths, to: Date())!
+        let child = Child(name: "Aanya", birthDate: birth)
+        container.mainContext.insert(child)
+        DataSeeder.seed(for: child, in: container.mainContext)
+        return child
+    }
+
+    // Listing milestones the child isn't old enough for would pad the report with
+    // noise a clinician has to filter out.
+    func testReportOnlyCoversMilestonesUpToCurrentAge() throws {
+        let child = try makeChild(ageMonths: 9)
+        let report = ReportBuilder.build(for: child)
+
+        let ages = report.sections.flatMap { $0.completed + $0.pending }.map(\.ageMonth)
+        XCTAssertFalse(ages.isEmpty)
+        XCTAssertTrue(ages.allSatisfy { $0 <= 9 })
+    }
+
+    func testCustomMomentsAreListedSeparatelyNotAsExpectations() throws {
+        let child = try makeChild(ageMonths: 12)
+
+        let moment = Milestone(
+            title: "First swim",
+            category: "Gross Motor",
+            ageMonth: 12,
+            isCompleted: true,
+            child: child,
+            isUserCreated: true
+        )
+        container.mainContext.insert(moment)
+
+        let report = ReportBuilder.build(for: child)
+
+        XCTAssertEqual(report.ownMoments.count, 1)
+        XCTAssertEqual(report.ownMoments.first?.title, "First swim")
+
+        // Must not appear in the clinical domain counts.
+        let clinicalTitles = report.sections.flatMap { $0.completed + $0.pending }.map(\.title)
+        XCTAssertFalse(clinicalTitles.contains("First swim"))
+    }
+
+    func testNotYetMetSurfacesOnlySignificantlyLateMilestones() throws {
+        let child = try makeChild(ageMonths: 24)
+        let report = ReportBuilder.build(for: child)
+
+        // Nothing is complete, so every milestone more than 3 months overdue lands here.
+        XCTAssertFalse(report.notYetMet.isEmpty)
+        XCTAssertTrue(report.notYetMet.allSatisfy { $0.ageMonth < 24 - 3 + 1 })
+        XCTAssertTrue(report.notYetMet.allSatisfy { !$0.isUserCreated })
+    }
+
+    func testPDFRendersAsAValidMultiPageDocument() throws {
+        let child = try makeChild(ageMonths: 36)
+        let report = ReportBuilder.build(for: child)
+
+        let url = try XCTUnwrap(ShareRenderer.pdf(for: report))
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+
+        let document = try XCTUnwrap(PDFDocument(url: url))
+        // A 36-month report is long; it must paginate rather than clip.
+        XCTAssertGreaterThan(document.pageCount, 1)
+
+        let text = (0..<document.pageCount)
+            .compactMap { document.page(at: $0)?.string }
+            .joined()
+        XCTAssertTrue(text.contains("Aanya"))
+        // The medical disclaimer must survive into the shared artifact.
+        XCTAssertTrue(text.contains("not a screening result"))
+    }
+
+    func testShareCardRendersToAPNG() throws {
+        let child = try makeChild(ageMonths: 12)
+        let milestone = try XCTUnwrap(child.sortedMilestones.first)
+        milestone.isCompleted = true
+        milestone.dateCompleted = Date()
+
+        let url = try XCTUnwrap(
+            ShareRenderer.card(for: milestone, childName: "Aanya", nightMode: false)
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+
+        let data = try Data(contentsOf: url)
+        XCTAssertFalse(data.isEmpty)
+        XCTAssertNotNil(UIImage(data: data))
     }
 }

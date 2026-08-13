@@ -33,6 +33,8 @@ struct DashboardView: View {
 
     @State private var viewModel = DashboardViewModel()
     @State private var scrollOffset: CGFloat = 0
+    @State private var shareItem: ShareItem? = nil
+    @State private var isBuildingReport = false
 
     // MARK: - Body
 
@@ -51,6 +53,7 @@ struct DashboardView: View {
                     recentMomentsCard
                     screeningCards
                     growthInsightsSection
+                    reportCard
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -76,6 +79,59 @@ struct DashboardView: View {
         .onAppear {
             viewModel.update(milestones: milestones, child: child)
         }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url)
+        }
+    }
+
+    // MARK: - Report (feature C)
+
+    // One button, one output. No date range, no domain filter, no format picker —
+    // every option here is a decision a tired parent has to make in a waiting room.
+    private var reportCard: some View {
+        Button {
+            guard let active = childStore.activeChild, !isBuildingReport else { return }
+            isBuildingReport = true
+            let report = ReportBuilder.build(for: active)
+            if let url = ShareRenderer.pdf(for: report) {
+                shareItem = ShareItem(url: url)
+            }
+            isBuildingReport = false
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(theme.blue.opacity(0.12))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 17))
+                        .foregroundStyle(theme.blue)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Report for your visit")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(theme.text)
+                    Text("A summary to bring to the pediatrician")
+                        .font(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                }
+
+                Spacer()
+
+                if isBuildingReport {
+                    ProgressView()
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(theme.textSecondary.opacity(0.6))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .warmCard(nightMode: theme.isNightMode)
+        .accessibilityLabel("Report for your visit")
+        .accessibilityHint("Creates a PDF summary of \(child.displayName)'s milestones to share")
     }
 
     // MARK: - Header Card

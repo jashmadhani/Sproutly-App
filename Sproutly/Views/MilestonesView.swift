@@ -41,6 +41,7 @@ struct MilestonesView: View {
     @State private var pendingPhotoData: Data? = nil
     @State private var milestoneToDelete: Milestone? = nil
     @State private var showDeleteMilestoneAlert: Bool = false
+    @State private var shareItem: ShareItem? = nil
 
     // MARK: - Derived Data
 
@@ -122,6 +123,9 @@ struct MilestonesView: View {
             }
         } message: { milestone in
             Text("\"\(milestone.title)\" will be removed permanently.")
+        }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url)
         }
         .sheet(isPresented: $showAddMilestone) {
             if let active = childStore.activeChild {
@@ -360,6 +364,20 @@ struct MilestonesView: View {
         .accessibilityElement(children: .combine)
         // Only parent-authored moments can be removed; the standard set is fixed.
         .contextMenu {
+            if milestone.isCompleted {
+                Button {
+                    if let url = ShareRenderer.card(
+                        for: milestone,
+                        childName: child.displayName,
+                        nightMode: theme.isNightMode
+                    ) {
+                        shareItem = ShareItem(url: url)
+                    }
+                } label: {
+                    Label("Share this moment", systemImage: "square.and.arrow.up")
+                }
+            }
+
             if milestone.isUserCreated {
                 Button(role: .destructive) {
                     milestoneToDelete = milestone
