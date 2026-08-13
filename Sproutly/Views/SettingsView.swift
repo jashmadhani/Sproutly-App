@@ -10,13 +10,18 @@ import SwiftData
 
 
 struct SettingsView: View {
-    @Environment(ChildProfile.self) private var childProfile
+    @Environment(ChildStore.self) private var childStore
+
+    private var child: Child { childStore.activeChild ?? Child() }
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var theme
     
     @State private var showResetAlert = false
     @State private var showDeleteAlert = false
     @State private var showAboutData = false
+    @State private var showAddChild = false
+    @State private var showRemoveChildAlert = false
+    @State private var childToDelete: Child?
     @State private var scrollOffset: CGFloat = 0
     
     private var isCompactHeader: Bool { scrollOffset < -10 }
@@ -29,6 +34,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     headerSection
                     nightModeCard
+                    childrenSection
                     profileSection
                     prematuritySection
                     aboutSection
@@ -75,17 +81,31 @@ struct SettingsView: View {
             }
             .ignoresSafeArea()
         }
-        .alert("Reset Progress", isPresented: $showResetAlert) {
+        // Both alerts name the child. With siblings in the app, an unnamed
+        // destructive confirmation is how a parent wipes the wrong one.
+        .alert("Reset \(child.displayName)'s Progress", isPresented: $showResetAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) { resetProgress() }
         } message: {
-            Text("This will unmark all milestones. Your child's profile will be kept.")
+            Text("This unmarks every milestone for \(child.displayName). Their profile is kept, and other children are not affected.")
         }
         .alert("Delete All Data", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) { deleteAllData() }
         } message: {
-            Text("This will remove all data and return to the welcome screen.")
+            Text("This removes every child and all their milestones, and returns to the welcome screen.")
+        }
+        .alert("Remove \(childToDelete?.displayName ?? "")?", isPresented: $showRemoveChildAlert) {
+            Button("Cancel", role: .cancel) { childToDelete = nil }
+            Button("Remove", role: .destructive) {
+                if let target = childToDelete { childStore.delete(target) }
+                childToDelete = nil
+            }
+        } message: {
+            Text("This permanently removes \(childToDelete?.displayName ?? "this child") and their milestones. Other children are not affected.")
+        }
+        .sheet(isPresented: $showAddChild) {
+            AddChildSheet()
         }
         .sheet(isPresented: $showAboutData) {
             AboutDataView()
@@ -146,13 +166,87 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
     }
     
+    // MARK: - Children
+
+    // Roster + add. The list itself is only shown once a second child exists —
+    // a parent with one child sees just "Add a child".
+    private var childrenSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Children", systemImage: "figure.2.and.child.holdinghands")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(theme.blue)
+
+            if childStore.hasMultipleChildren {
+                ForEach(childStore.children) { entry in
+                    let isActive = entry.id == childStore.activeChild?.id
+
+                    HStack(spacing: 12) {
+                        Button {
+                            childStore.select(entry)
+                        } label: {
+                            HStack(spacing: 12) {
+                                ChildAvatar(child: entry, isActive: isActive, nightMode: theme.isNightMode)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.displayName)
+                                        .font(.subheadline.weight(isActive ? .semibold : .regular))
+                                        .foregroundStyle(theme.text)
+                                    Text(entry.ageText)
+                                        .font(.caption)
+                                        .foregroundStyle(theme.textSecondary)
+                                }
+
+                                Spacer()
+
+                                if isActive {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(theme.green)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(entry.displayName), \(entry.ageText)")
+                        .accessibilityHint(isActive ? "Currently showing" : "Switch to this child")
+
+                        Button {
+                            childToDelete = entry
+                            showRemoveChildAlert = true
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .foregroundStyle(.red.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(entry.displayName)")
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Button {
+                showAddChild = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(theme.blue)
+                    Text("Add a child")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.text)
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Adds another child with their own milestones")
+        }
+        .warmCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - Profile
-    
+
     private var profileSection: some View {
-        @Bindable var profile = childProfile
+        @Bindable var profile = child
         
         return VStack(alignment: .leading, spacing: 16) {
-            Label("Your Little One", systemImage: "heart.fill")
+            Label(child.displayName, systemImage: "heart.fill")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(theme.blue)
             
@@ -170,8 +264,8 @@ struct SettingsView: View {
                             .fill(theme.text.opacity(0.04))
                     )
                     .foregroundStyle(theme.text)
-                    .onChange(of: childProfile.name) { _, _ in
-                        childProfile.save()
+                    .onChange(of: child.name) { _, _ in
+                        childStore.save()
                     }
             }
             
@@ -185,8 +279,8 @@ struct SettingsView: View {
                     .datePickerStyle(.compact)
                     .labelsHidden()
                     .tint(theme.blue)
-                    .onChange(of: childProfile.birthDate) { _, _ in
-                        childProfile.save()
+                    .onChange(of: child.birthDate) { _, _ in
+                        childStore.save()
                     }
             }
         }
@@ -196,7 +290,7 @@ struct SettingsView: View {
     // MARK: - Prematurity
     
     private var prematuritySection: some View {
-        @Bindable var profile = childProfile
+        @Bindable var profile = child
         
         return VStack(alignment: .leading, spacing: 16) {
             Label("Adjusted Age", systemImage: "sparkles")
@@ -216,11 +310,11 @@ struct SettingsView: View {
             .tint(theme.green)
             .accessibilityLabel("Born Before 37 Weeks")
             .accessibilityHint("Adjusts milestones for premature birth")
-            .onChange(of: childProfile.isPremature) { _, _ in
-                childProfile.save()
+            .onChange(of: child.isPremature) { _, _ in
+                childStore.save()
             }
             
-            if childProfile.isPremature {
+            if child.isPremature {
                 HStack {
                     Text("Gestational age:")
                         .font(.subheadline)
@@ -232,15 +326,15 @@ struct SettingsView: View {
                         }
                     }
                     .tint(theme.blue)
-                    .onChange(of: childProfile.gestationalWeeks) { _, _ in
-                        childProfile.save()
+                    .onChange(of: child.gestationalWeeks) { _, _ in
+                        childStore.save()
                     }
                 }
                 .transition(.opacity)
             }
         }
         .warmCard(nightMode: theme.isNightMode)
-        .animation(.spring(response: 0.4), value: childProfile.isPremature)
+        .animation(.spring(response: 0.4), value: child.isPremature)
     }
     
     // MARK: - About
@@ -305,39 +399,34 @@ struct SettingsView: View {
     
     // MARK: - Actions
     
+    // Scoped to the active child only — a sibling's progress is never touched.
     private func resetProgress() {
-        let descriptor = FetchDescriptor<Milestone>()
-        if let allMilestones = try? modelContext.fetch(descriptor) {
-            for milestone in allMilestones {
-                milestone.isCompleted = false
-                milestone.dateCompleted = nil
-                milestone.completionNote = ""
-            }
-            try? modelContext.save()
+        guard let active = childStore.activeChild else { return }
+        for milestone in active.milestones {
+            milestone.isCompleted = false
+            milestone.dateCompleted = nil
+            milestone.completionNote = ""
         }
+        childStore.save()
     }
-    
+
     private func deleteAllData() {
         // Roll back to light mode (default mode)
         theme.isNightMode = false
-        
-        // Delete all milestones
-        let descriptor = FetchDescriptor<Milestone>()
-        if let allMilestones = try? modelContext.fetch(descriptor) {
-            for milestone in allMilestones {
-                modelContext.delete(milestone)
-            }
-            try? modelContext.save()
+
+        // Deleting each child cascades to their milestones.
+        for child in childStore.children {
+            childStore.delete(child)
         }
-        
-        // Reset profile
-        childProfile.reset()
+
+        LegacyProfile.clear()
+        childStore.refresh()
     }
 }
 
 #Preview {
     SettingsView()
-        .environment(ChildProfile())
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

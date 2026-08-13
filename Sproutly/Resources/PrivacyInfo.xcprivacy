@@ -16,7 +16,7 @@
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
-			<!-- ChildProfile + ThemeManager persist to UserDefaults. -->
+			<!-- Active-child selection + ThemeManager persist to UserDefaults. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>

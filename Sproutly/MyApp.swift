@@ -13,7 +13,7 @@ import SwiftData
 
 @MainActor
 let sharedAppContainer: ModelContainer = {
-    let schema = Schema(versionedSchema: SproutlySchemaV1.self)
+    let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
 
     // A named ModelConfiguration resolves to Library/Application Support/SproutlyDB.store,
     // but that directory does not exist in a freshly installed container and SwiftData
@@ -29,39 +29,68 @@ let sharedAppContainer: ModelContainer = {
 
     let config = ModelConfiguration("SproutlyDB", schema: schema, isStoredInMemoryOnly: false)
 
-    do {
-        let container = try ModelContainer(
-            for: schema,
-            migrationPlan: SproutlyMigrationPlan.self,
-            configurations: [config]
-        )
-        DataSeeder.seedIfNeeded(modelContext: container.mainContext)
-        return container
-    } catch {
-        // Never black-screen a parent who just opened the app. If the on-disk store is
-        // unusable, fall back to an in-memory one so the UI still runs this session.
-        print("⚠️ Sproutly: on-disk store unavailable, using in-memory — \(error)")
-
-        let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        guard let container = try? ModelContainer(for: schema, configurations: [fallback]) else {
-            fatalError("Failed to build even an in-memory container: \(error)")
-        }
-        DataSeeder.seedIfNeeded(modelContext: container.mainContext)
+    // 1. Normal path.
+    if let container = try? ModelContainer(
+        for: schema,
+        migrationPlan: SproutlyMigrationPlan.self,
+        configurations: [config]
+    ) {
         return container
     }
+
+    // 2. The store exists but cannot be opened — an incompatible pre-release store,
+    //    or corruption. Move it aside rather than deleting it, so the data is still
+    //    recoverable, and start clean instead of crash-looping on every launch.
+    print("⚠️ Sproutly: store unreadable, archiving it and starting fresh")
+    archiveExistingStore()
+
+    if let container = try? ModelContainer(
+        for: schema,
+        migrationPlan: SproutlyMigrationPlan.self,
+        configurations: [config]
+    ) {
+        return container
+    }
+
+    // 3. Disk is unusable entirely. Run in memory for this session rather than
+    //    black-screening a parent who just opened the app.
+    print("⚠️ Sproutly: on-disk store unavailable, using in-memory for this session")
+    let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    guard let container = try? ModelContainer(for: schema, configurations: [fallback]) else {
+        fatalError("Failed to build even an in-memory container")
+    }
+    return container
 }()
+
+// Renames SproutlyDB.store (and its -shm/-wal siblings) with a timestamp suffix.
+private func archiveExistingStore() {
+    let fileManager = FileManager.default
+    guard let appSupport = fileManager
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+
+    let stamp = Int(Date().timeIntervalSince1970)
+    for suffix in ["store", "store-shm", "store-wal"] {
+        let source = appSupport.appendingPathComponent("SproutlyDB.\(suffix)")
+        guard fileManager.fileExists(atPath: source.path) else { continue }
+
+        let destination = appSupport
+            .appendingPathComponent("SproutlyDB-backup-\(stamp).\(suffix)")
+        try? fileManager.moveItem(at: source, to: destination)
+    }
+}
 
 // MARK: - App Entry Point
 
 @main
+@MainActor
 struct MyApp: App {
-    @State private var childProfile = ChildProfile.load()
+    @State private var childStore = ChildStore(context: sharedAppContainer.mainContext)
     @State private var themeManager = ThemeManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(childProfile)
+                .environment(childStore)
                 .environment(themeManager)
                 .preferredColorScheme(themeManager.preferredColorScheme)
         }
@@ -72,14 +101,13 @@ struct MyApp: App {
 // MARK: - Root View
 
 struct ContentView: View {
-    @Environment(ChildProfile.self) private var childProfile
+    @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
-    @Environment(\.modelContext) private var modelContext
-    @State private var hasSeeded = false
-    
+    @State private var hasImported = false
+
     var body: some View {
         Group {
-            if !childProfile.hasCompletedOnboarding {
+            if childStore.needsOnboarding {
                 OnboardingView()
             } else {
                 MainTabView()
@@ -87,9 +115,10 @@ struct ContentView: View {
         }
         .transaction { $0.animation = nil }
         .task {
-            guard !hasSeeded else { return }
-            hasSeeded = true
-            DataSeeder.seedIfNeeded(modelContext: modelContext)
+            guard !hasImported else { return }
+            hasImported = true
+            // Adopts any pre-multi-child data into a real Child.
+            childStore.importLegacyProfileIfNeeded()
         }
     }
 }

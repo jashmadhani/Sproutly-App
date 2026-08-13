@@ -21,9 +21,14 @@ struct ScrollOffsetKey: PreferenceKey {
 
 
 struct DashboardView: View {
-    @Query(sort: \Milestone.ageMonth) private var milestones: [Milestone]
+    
     @Environment(\.modelContext) private var modelContext
-    @Environment(ChildProfile.self) private var childProfile
+    @Environment(ChildStore.self) private var childStore
+
+    // MainTabView only renders once a child exists; the fallback keeps this view
+    // total without threading an optional through every call site.
+    private var child: Child { childStore.activeChild ?? Child() }
+    private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
 
     @State private var viewModel = DashboardViewModel()
@@ -54,37 +59,69 @@ struct DashboardView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .onAppear {
-            if milestones.isEmpty {
-                DataSeeder.seedIfNeeded(modelContext: modelContext)
+            if let active = childStore.activeChild {
+                DataSeeder.reseedIfIncomplete(for: active, in: modelContext)
             }
         }
         .onChange(of: milestones.count) {
-            viewModel.update(milestones: milestones, childProfile: childProfile)
+            viewModel.update(milestones: milestones, child: child)
         }
         .onChange(of: milestones.filter(\.isCompleted).count) {
-            viewModel.update(milestones: milestones, childProfile: childProfile)
+            viewModel.update(milestones: milestones, child: child)
+        }
+        // Switching children must recompute everything derived.
+        .onChange(of: childStore.activeChild?.id) {
+            viewModel.update(milestones: milestones, child: child)
         }
         .onAppear {
-            viewModel.update(milestones: milestones, childProfile: childProfile)
+            viewModel.update(milestones: milestones, child: child)
         }
     }
 
     // MARK: - Header Card
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(viewModel.greetingText)
-                .font(.subheadline)
-                .foregroundStyle(theme.textSecondary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(viewModel.greetingText)
+                    .font(.subheadline)
+                    .foregroundStyle(theme.textSecondary)
 
-            Text(childProfile.name.isEmpty ? "Little one" : childProfile.name)
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(theme.text)
+                Text(child.displayName)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(theme.text)
 
-            Text("You're \(childProfile.humanReadableAge)!")
-                .font(.callout)
-                .foregroundStyle(theme.textSecondary)
+                Text("You're \(child.humanReadableAge)!")
+                    .font(.callout)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            Spacer()
+
+            // The switcher only exists once there is someone to switch to.
+            if childStore.hasMultipleChildren {
+                Menu {
+                    ForEach(childStore.children) { entry in
+                        Button {
+                            childStore.select(entry)
+                        } label: {
+                            if entry.id == childStore.activeChild?.id {
+                                Label(entry.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(entry.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    ChildAvatar(
+                        child: child,
+                        size: 44,
+                        nightMode: theme.isNightMode
+                    )
+                }
+                .accessibilityLabel("Showing \(child.displayName). Switch child")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, 4)
@@ -300,13 +337,9 @@ struct DashboardView: View {
 // MARK: - Preview
 
 #Preview {
-    let profile = ChildProfile()
-    profile.birthDate = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-    profile.name = "Preview"
-    profile.hasCompletedOnboarding = true
 
-    return DashboardView()
-        .environment(profile)
+    DashboardView()
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

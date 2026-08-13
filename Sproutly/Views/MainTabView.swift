@@ -113,13 +113,9 @@ struct MainTabView: View {
 }
 
 #Preview {
-    let profile = ChildProfile()
-    profile.birthDate = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-    profile.name = "Preview"
-    profile.hasCompletedOnboarding = true
 
-    return MainTabView()
-        .environment(profile)
+    MainTabView()
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

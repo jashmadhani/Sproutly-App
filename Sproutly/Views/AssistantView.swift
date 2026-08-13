@@ -10,14 +10,19 @@ import SwiftData
 
 
 struct AssistantView: View {
-    @Query(sort: \Milestone.ageMonth) private var milestones: [Milestone]
-    @Environment(ChildProfile.self) private var childProfile
+    
+    @Environment(ChildStore.self) private var childStore
+
+    // MainTabView only renders once a child exists; the fallback keeps this view
+    // total without threading an optional through every call site.
+    private var child: Child { childStore.activeChild ?? Child() }
+    private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
 
     @State private var scrollOffset: CGFloat = 0
 
     private var isCompactHeader: Bool { scrollOffset < -10 }
-    private var correctedAge: Int { max(0, childProfile.calculateCorrectedAge()) }
+    private var correctedAge: Int { max(0, child.calculateCorrectedAge()) }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -102,13 +107,9 @@ struct AssistantView: View {
 // MARK: - Preview
 
 #Preview {
-    let profile = ChildProfile()
-    profile.birthDate = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-    profile.name = "Preview"
-    profile.hasCompletedOnboarding = true
 
-    return AssistantView()
-        .environment(profile)
+    AssistantView()
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

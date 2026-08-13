@@ -10,7 +10,7 @@ import SwiftData
 
 /// Five-step onboarding flow: Welcome → How It Works → Reassurance → Disclaimer → Profile.
 struct OnboardingView: View {
-    @Environment(ChildProfile.self) private var childProfile
+    @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
 
     @State private var step = 0
@@ -463,19 +463,21 @@ private extension OnboardingView {
         .padding(.bottom, 40)
     }
 
+    // Creating the first child is what ends onboarding — ContentView switches over
+    // as soon as the store has one.
     func completeOnboarding() {
-        childProfile.name = childName
-        childProfile.birthDate = birthDate
-        childProfile.isPremature = isPremature
-        childProfile.gestationalWeeks = isPremature ? gestationalWeeks : 40
-        childProfile.hasCompletedOnboarding = true
-        childProfile.save()
+        childStore.addChild(
+            name: childName.trimmingCharacters(in: .whitespacesAndNewlines),
+            birthDate: birthDate,
+            isPremature: isPremature,
+            gestationalWeeks: isPremature ? gestationalWeeks : 40
+        )
     }
 }
 
 #Preview {
     OnboardingView()
-        .environment(ChildProfile())
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

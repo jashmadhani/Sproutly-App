@@ -33,8 +33,8 @@ final class DashboardViewModel {
     // MARK: - Update
 
     // refreshes derived state, skips if inputs unchanged
-    func update(milestones: [Milestone], childProfile: ChildProfile) {
-        let age = max(0, childProfile.calculateCorrectedAge())
+    func update(milestones: [Milestone], child: Child) {
+        let age = max(0, child.calculateCorrectedAge())
         var hasher = Hasher()
         for milestone in milestones {
             hasher.combine(milestone.id)

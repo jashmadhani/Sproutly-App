@@ -20,9 +20,14 @@ enum MilestoneFilter: String, CaseIterable {
 
 
 struct MilestonesView: View {
-    @Query(sort: \Milestone.ageMonth) private var milestones: [Milestone]
+    
     @Environment(\.modelContext) private var modelContext
-    @Environment(ChildProfile.self) private var childProfile
+    @Environment(ChildStore.self) private var childStore
+
+    // MainTabView only renders once a child exists; the fallback keeps this view
+    // total without threading an optional through every call site.
+    private var child: Child { childStore.activeChild ?? Child() }
+    private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
 
     @State private var selectedFilter: MilestoneFilter = .thisStage
@@ -34,7 +39,7 @@ struct MilestonesView: View {
 
     // MARK: - Derived Data
 
-    private var correctedAge: Int { max(0, childProfile.calculateCorrectedAge()) }
+    private var correctedAge: Int { max(0, child.calculateCorrectedAge()) }
 
     private var targetAgeMonth: Int {
         guard !milestones.isEmpty else { return 6 }
@@ -434,13 +439,9 @@ struct MilestonesView: View {
 // MARK: - Preview
 
 #Preview {
-    let profile = ChildProfile()
-    profile.birthDate = Calendar.current.date(byAdding: .month, value: -6, to: Date()) ?? Date()
-    profile.name = "Preview"
-    profile.hasCompletedOnboarding = true
 
-    return MilestonesView()
-        .environment(profile)
+    MilestonesView()
+        .environment(previewChildStore)
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

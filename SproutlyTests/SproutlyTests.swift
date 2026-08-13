@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Sproutly
 
 final class MilestoneTests: XCTestCase {
@@ -71,26 +72,193 @@ final class DevelopmentObserverTests: XCTestCase {
 final class DashboardViewModelTests: XCTestCase {
     func testUpdateRecomputesWhenMilestoneFieldsChangeWithoutCountChange() {
         let milestone = Milestone(title: "Walks", category: "Gross Motor", ageMonth: 0)
-        let profile = ChildProfile(birthDate: Date())
+        let child = Child(birthDate: Date())
         let viewModel = DashboardViewModel()
 
-        viewModel.update(milestones: [milestone], childProfile: profile)
+        viewModel.update(milestones: [milestone], child: child)
         XCTAssertEqual(viewModel.domainConcerns.count, 0)
 
         milestone.ageMonth = -2
-        viewModel.update(milestones: [milestone], childProfile: profile)
+        viewModel.update(milestones: [milestone], child: child)
 
         XCTAssertEqual(viewModel.flaggedMilestones.count, 1)
         XCTAssertEqual(viewModel.domainConcerns.first?.category, .grossMotor)
     }
 }
 
-final class ChildProfileTests: XCTestCase {
+final class ChildTests: XCTestCase {
     func testChronologicalAgeWeeksUsesElapsedDays() {
         let birthDate = Calendar.current.date(byAdding: .day, value: -8, to: Date())!
-        let profile = ChildProfile(birthDate: birthDate)
+        let child = Child(birthDate: birthDate)
 
-        XCTAssertEqual(profile.chronologicalAgeWeeks, 1)
-        XCTAssertEqual(profile.humanReadableAge, "1 week old")
+        XCTAssertEqual(child.chronologicalAgeWeeks, 1)
+        XCTAssertEqual(child.humanReadableAge, "1 week old")
+    }
+}
+
+// MARK: - Multi-child
+
+// Free function so it stays nonisolated and usable from XCTest's setUp/tearDown.
+private func clearSproutlyDefaults() {
+    UserDefaults.standard.removeObject(forKey: "sproutly_active_child_id")
+    UserDefaults.standard.removeObject(forKey: "sproutly_profile")
+    UserDefaults.standard.removeObject(forKey: "elitegrowth_profile")
+}
+
+@MainActor
+final class ChildStoreTests: XCTestCase {
+
+    // Fresh in-memory container per test so cases can't leak into each other.
+    // Held as a property: a ModelContext does not keep its container alive, and a
+    // context whose container has deallocated traps on the next fetch.
+    private var container: ModelContainer!
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        container = try ModelContainer(for: schema, configurations: [config])
+        return container.mainContext
+    }
+
+    override nonisolated func setUp() {
+        super.setUp()
+        clearSproutlyDefaults()
+    }
+
+    override nonisolated func tearDown() {
+        clearSproutlyDefaults()
+        super.tearDown()
+    }
+
+
+    func testEachChildIsSeededWithTheirOwnMilestones() throws {
+        let store = ChildStore(context: try makeContext())
+
+        let first = store.addChild(name: "Aanya", birthDate: Date())
+        let second = store.addChild(name: "Vir", birthDate: Date())
+
+        XCTAssertEqual(first.milestones.count, DataSeeder.allMilestones.count)
+        XCTAssertEqual(second.milestones.count, DataSeeder.allMilestones.count)
+
+        // No milestone object is shared between siblings.
+        let firstIDs = Set(first.milestones.map(\.id))
+        let secondIDs = Set(second.milestones.map(\.id))
+        XCTAssertTrue(firstIDs.isDisjoint(with: secondIDs))
+    }
+
+    // The core multi-child guarantee: logging for one child must not touch a sibling.
+    func testCompletingAMilestoneDoesNotAffectSibling() throws {
+        let store = ChildStore(context: try makeContext())
+        let first = store.addChild(name: "Aanya", birthDate: Date())
+        let second = store.addChild(name: "Vir", birthDate: Date())
+
+        let target = try XCTUnwrap(first.sortedMilestones.first)
+        target.isCompleted = true
+        store.save()
+
+        XCTAssertEqual(first.milestones.filter(\.isCompleted).count, 1)
+        XCTAssertEqual(second.milestones.filter(\.isCompleted).count, 0)
+    }
+
+    func testAddingAChildMakesItActiveAndPersistsSelection() throws {
+        let store = ChildStore(context: try makeContext())
+        let first = store.addChild(name: "Aanya", birthDate: Date())
+        XCTAssertEqual(store.activeChild?.id, first.id)
+
+        let second = store.addChild(name: "Vir", birthDate: Date())
+        XCTAssertEqual(store.activeChild?.id, second.id)
+
+        store.select(first)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: "sproutly_active_child_id"),
+            first.id.uuidString
+        )
+    }
+
+    func testSwitcherStaysHiddenUntilASecondChildExists() throws {
+        let store = ChildStore(context: try makeContext())
+        XCTAssertTrue(store.needsOnboarding)
+
+        store.addChild(name: "Aanya", birthDate: Date())
+        XCTAssertFalse(store.needsOnboarding)
+        XCTAssertFalse(store.hasMultipleChildren)
+
+        store.addChild(name: "Vir", birthDate: Date())
+        XCTAssertTrue(store.hasMultipleChildren)
+    }
+
+    func testDeletingAChildCascadesAndReassignsActive() throws {
+        let context = try makeContext()
+        let store = ChildStore(context: context)
+        let first = store.addChild(name: "Aanya", birthDate: Date())
+        let second = store.addChild(name: "Vir", birthDate: Date())
+
+        store.delete(second)
+
+        XCTAssertEqual(store.children.count, 1)
+        XCTAssertEqual(store.activeChild?.id, first.id)
+
+        // Cascade removed the deleted child's milestones, and only those.
+        let remaining = try context.fetch(FetchDescriptor<Milestone>())
+        XCTAssertEqual(remaining.count, DataSeeder.allMilestones.count)
+    }
+
+    // A pre-multi-child install has milestones with no owner plus a UserDefaults
+    // profile; both must be adopted into one Child exactly once.
+    func testLegacyProfileAndOrphanMilestonesAreAdopted() throws {
+        let context = try makeContext()
+
+        let orphan = Milestone(title: "Sits", category: "Gross Motor", ageMonth: 6, isCompleted: true)
+        context.insert(orphan)
+        try context.save()
+
+        UserDefaults.standard.set(
+            [
+                "name": "Aanya",
+                "birthDate": Date().timeIntervalSince1970,
+                "isPremature": true,
+                "gestationalWeeks": 32
+            ],
+            forKey: "sproutly_profile"
+        )
+
+        let store = ChildStore(context: context)
+        store.importLegacyProfileIfNeeded()
+
+        XCTAssertEqual(store.children.count, 1)
+        let adopted = try XCTUnwrap(store.activeChild)
+        XCTAssertEqual(adopted.name, "Aanya")
+        XCTAssertTrue(adopted.isPremature)
+        XCTAssertEqual(adopted.gestationalWeeks, 32)
+
+        // The completed milestone survived with its progress intact.
+        XCTAssertEqual(adopted.milestones.count, 1)
+        XCTAssertTrue(adopted.milestones.first?.isCompleted == true)
+
+        // Idempotent: a second pass must not create another child.
+        store.importLegacyProfileIfNeeded()
+        XCTAssertEqual(store.children.count, 1)
+    }
+}
+
+// MARK: - Custom milestones
+
+final class CustomMilestoneTests: XCTestCase {
+
+    // Parent-authored moments have no expected age, so they must never be flagged
+    // late or scored against a developmental domain.
+    func testUserCreatedMilestoneIsNeverLate() {
+        let custom = Milestone(
+            title: "First swim",
+            category: "Gross Motor",
+            ageMonth: 0,
+            isUserCreated: true
+        )
+
+        XCTAssertFalse(custom.isSignificantlyLate(childAgeMonths: 48))
+        XCTAssertEqual(custom.getTimingStatus(childAgeMonths: 48), .comingSoon)
+
+        custom.isCompleted = true
+        XCTAssertEqual(custom.getTimingStatus(childAgeMonths: 48), .celebrated)
     }
 }

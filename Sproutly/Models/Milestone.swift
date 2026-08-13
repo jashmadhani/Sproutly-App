@@ -33,9 +33,17 @@ final class Milestone: Identifiable {
     
 
     var completionNote: String
-    
+
+    // Owning child. Optional because SwiftData requires optionality for the inverse
+    // side, and because a legacy store briefly holds milestones before adoption.
+    var child: Child?
+
+    // Parent-authored moments ("first swim") have no clinically expected age, so
+    // they are excluded from timing status and from domain scoring.
+    var isUserCreated: Bool = false
+
     // MARK: - Initializer
-    
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -44,7 +52,9 @@ final class Milestone: Identifiable {
         isCompleted: Bool = false,
         dateCompleted: Date? = nil,
         tips: String = "",
-        completionNote: String = ""
+        completionNote: String = "",
+        child: Child? = nil,
+        isUserCreated: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -54,6 +64,8 @@ final class Milestone: Identifiable {
         self.dateCompleted = dateCompleted
         self.tips = tips
         self.completionNote = completionNote
+        self.child = child
+        self.isUserCreated = isUserCreated
     }
     
     // MARK: - Computed
@@ -155,6 +167,11 @@ enum TimingStatus: String {
 
 extension Milestone {
     func getTimingStatus(childAgeMonths: Int) -> TimingStatus {
+        // A parent-authored moment has no expected age — it can never be "late",
+        // only celebrated once it happens.
+        if isUserCreated {
+            return isCompleted ? .celebrated : .comingSoon
+        }
         if isCompleted {
             return childAgeMonths < ageMonth ? .celebrated : .onTrack
         }
@@ -168,6 +185,6 @@ extension Milestone {
     }
     
     func isSignificantlyLate(childAgeMonths: Int) -> Bool {
-        !isCompleted && childAgeMonths > ageMonth + 3
+        !isUserCreated && !isCompleted && childAgeMonths > ageMonth + 3
     }
 }

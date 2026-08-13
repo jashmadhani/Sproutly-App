@@ -20,19 +20,14 @@ struct DataSeeder {
 
     // MARK: - Entry Points
 
+    // Gives one child their own copy of the standard milestone set. Each child is
+    // seeded independently, so siblings never share progress.
     @MainActor
-    static func seedIfNeeded(modelContext: ModelContext) {
-        let descriptor = FetchDescriptor<Milestone>()
-        let existingCount = (try? modelContext.fetchCount(descriptor)) ?? 0
-
-        guard existingCount < 80 else { return }
-
-        // Delete any partial data first
-        if let existing = try? modelContext.fetch(descriptor) {
-            for m in existing { modelContext.delete(m) }
+    static func seed(for child: Child, in modelContext: ModelContext) {
+        for milestone in allMilestones {
+            milestone.child = child
+            modelContext.insert(milestone)
         }
-
-        for m in allMilestones { modelContext.insert(m) }
 
         do {
             try modelContext.save()
@@ -41,9 +36,17 @@ struct DataSeeder {
         }
     }
 
+    // Repairs a child whose standard milestones are missing or incomplete, leaving
+    // parent-authored ones untouched.
     @MainActor
-    static func loadSampleData(modelContext: ModelContext) {
-        seedIfNeeded(modelContext: modelContext)
+    static func reseedIfIncomplete(for child: Child, in modelContext: ModelContext) {
+        let standard = child.milestones.filter { !$0.isUserCreated }
+        guard standard.count < allMilestones.count else { return }
+
+        for milestone in standard {
+            modelContext.delete(milestone)
+        }
+        seed(for: child, in: modelContext)
     }
 
     // MARK: - 6 Months
