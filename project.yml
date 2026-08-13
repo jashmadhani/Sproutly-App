@@ -56,6 +56,8 @@ targets:
     platform: iOS
     sources:
       - path: SproutlyTests
+      - path: Sproutly.storekit
+        buildPhase: resources
     dependencies:
       - target: Sproutly
     settings:
@@ -70,6 +72,10 @@ schemes:
         Sproutly: all
     run:
       config: Debug
+      # Local StoreKit testing — purchases work in the simulator with no sandbox
+      # account. This file is for development only; App Store Connect is the
+      # source of truth in production.
+      storeKitConfiguration: Sproutly.storekit
     test:
       config: Debug
       targets:

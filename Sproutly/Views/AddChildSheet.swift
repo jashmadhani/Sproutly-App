@@ -117,6 +117,7 @@ struct AddChildSheet: View {
 #Preview {
     AddChildSheet()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

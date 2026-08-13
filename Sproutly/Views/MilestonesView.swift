@@ -24,6 +24,7 @@ struct MilestonesView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(ChildStore.self) private var childStore
+    @Environment(PurchaseManager.self) private var purchases
 
     // MainTabView only renders once a child exists; the fallback keeps this view
     // total without threading an optional through every call site.
@@ -42,6 +43,7 @@ struct MilestonesView: View {
     @State private var milestoneToDelete: Milestone? = nil
     @State private var showDeleteMilestoneAlert: Bool = false
     @State private var shareItem: ShareItem? = nil
+    @State private var paywallReason: PaywallReason? = nil
 
     // MARK: - Derived Data
 
@@ -127,6 +129,9 @@ struct MilestonesView: View {
         .sheet(item: $shareItem) { item in
             ShareSheet(url: item.url)
         }
+        .sheet(item: $paywallReason) { reason in
+            PaywallView(reason: reason)
+        }
         .sheet(isPresented: $showAddMilestone) {
             if let active = childStore.activeChild {
                 AddMilestoneSheet(child: active)
@@ -154,7 +159,11 @@ struct MilestonesView: View {
             Spacer()
 
             Button {
-                showAddMilestone = true
+                if purchases.isPro {
+                    showAddMilestone = true
+                } else {
+                    paywallReason = .customMilestone
+                }
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
@@ -366,6 +375,10 @@ struct MilestonesView: View {
         .contextMenu {
             if milestone.isCompleted {
                 Button {
+                    guard purchases.isPro else {
+                        paywallReason = .shareCard
+                        return
+                    }
                     if let url = ShareRenderer.card(
                         for: milestone,
                         childName: child.displayName,
@@ -452,10 +465,33 @@ struct MilestonesView: View {
 
             // Photo — offered, never required. The one-tap log stays one tap;
             // this sheet is already open, so nothing new interrupts the flow.
-            MilestonePhotoPicker(
-                imageData: $pendingPhotoData,
-                nightMode: theme.isNightMode
-            )
+            if purchases.isPro {
+                MilestonePhotoPicker(
+                    imageData: $pendingPhotoData,
+                    nightMode: theme.isNightMode
+                )
+            } else {
+                Button {
+                    paywallReason = .photo
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "photo.badge.plus")
+                        Text("Add a photo")
+                            .font(.subheadline)
+                        Spacer()
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(theme.textSecondary)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(theme.text.opacity(0.04))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
 
             // Buttons
             HStack(spacing: 14) {
@@ -549,6 +585,7 @@ struct MilestonesView: View {
 
     MilestonesView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

@@ -440,3 +440,46 @@ final class ReportTests: XCTestCase {
         XCTAssertNotNil(UIImage(data: data))
     }
 }
+
+// MARK: - Purchases
+
+@MainActor
+final class PurchaseManagerTests: XCTestCase {
+
+    // The invariant that keeps a paying customer from seeing a paywall flash on
+    // launch: entitlement state is unknown until the first check completes, and
+    // gates must wait for it rather than reading isPro == false as "not bought".
+    func testEntitlementStateStartsUnknownNotUnentitled() {
+        let manager = PurchaseManager()
+
+        XCTAssertFalse(manager.hasCheckedEntitlements)
+        XCTAssertFalse(manager.isPro)
+        XCTAssertEqual(manager.state, .idle)
+    }
+
+    func testProductIDMatchesTheStoreKitConfiguration() throws {
+        // Guards against the ID drifting from Sproutly.storekit / App Store Connect,
+        // which would silently break purchasing with no compile error.
+        XCTAssertEqual(PurchaseManager.productID, "com.jashmadhani.Sproutly.pro")
+
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(
+            forResource: "Sproutly", withExtension: "storekit"
+        ) ?? nil)
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        let products = json?["products"] as? [[String: Any]] ?? []
+        XCTAssertEqual(products.first?["productID"] as? String, PurchaseManager.productID)
+        // Family Sharing on: a parenting app where the other parent can't unlock
+        // it generates support mail and one-star reviews.
+        XCTAssertEqual(products.first?["familyShareable"] as? Bool, true)
+        XCTAssertEqual(products.first?["type"] as? String, "NonConsumable")
+    }
+
+    // Every gated surface must have copy; a blank paywall headline ships as a bug.
+    func testEveryPaywallReasonHasCopy() {
+        let reasons: [PaywallReason] = [.secondChild, .photo, .report, .shareCard, .customMilestone]
+        for reason in reasons {
+            XCTAssertFalse(reason.headline.isEmpty)
+        }
+        XCTAssertEqual(PaywallReason.allFeatures.count, 5)
+    }
+}

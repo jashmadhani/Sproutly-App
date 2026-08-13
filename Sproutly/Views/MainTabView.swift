@@ -116,6 +116,7 @@ struct MainTabView: View {
 
     MainTabView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

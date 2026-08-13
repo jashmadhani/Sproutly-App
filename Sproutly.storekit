@@ -1,0 +1,31 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : true,
+      "internalID" : "SPROUTLYPRO01",
+      "localizations" : [
+        {
+          "description" : "Every child, every memory, ready to share. One payment, yours forever.",
+          "displayName" : "Sproutly Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.jashmadhani.Sproutly.pro",
+      "referenceName" : "Sproutly Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "SPROUTLY",
+    "_developerTeamID" : "FDYHXN3XSH",
+    "_lastSynchronizedDate" : 0
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

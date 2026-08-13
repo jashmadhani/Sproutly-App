@@ -11,6 +11,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(ChildStore.self) private var childStore
+    @Environment(PurchaseManager.self) private var purchases
 
     private var child: Child { childStore.activeChild ?? Child() }
     @Environment(\.modelContext) private var modelContext
@@ -22,6 +23,7 @@ struct SettingsView: View {
     @State private var showAddChild = false
     @State private var showRemoveChildAlert = false
     @State private var childToDelete: Child?
+    @State private var paywallReason: PaywallReason? = nil
     @State private var scrollOffset: CGFloat = 0
     
     private var isCompactHeader: Bool { scrollOffset < -10 }
@@ -106,6 +108,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showAddChild) {
             AddChildSheet()
+        }
+        .sheet(item: $paywallReason) { reason in
+            PaywallView(reason: reason)
         }
         .sheet(isPresented: $showAboutData) {
             AboutDataView()
@@ -223,7 +228,12 @@ struct SettingsView: View {
             }
 
             Button {
-                showAddChild = true
+                // The first child is free; a second is where Pro begins.
+                if purchases.isPro || childStore.children.isEmpty {
+                    showAddChild = true
+                } else {
+                    paywallReason = .secondChild
+                }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "plus.circle.fill")
@@ -427,6 +437,7 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

@@ -478,6 +478,7 @@ private extension OnboardingView {
 #Preview {
     OnboardingView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

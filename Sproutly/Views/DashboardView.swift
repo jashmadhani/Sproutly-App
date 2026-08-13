@@ -24,6 +24,7 @@ struct DashboardView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(ChildStore.self) private var childStore
+    @Environment(PurchaseManager.self) private var purchases
 
     // MainTabView only renders once a child exists; the fallback keeps this view
     // total without threading an optional through every call site.
@@ -35,6 +36,7 @@ struct DashboardView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var shareItem: ShareItem? = nil
     @State private var isBuildingReport = false
+    @State private var paywallReason: PaywallReason? = nil
 
     // MARK: - Body
 
@@ -82,6 +84,9 @@ struct DashboardView: View {
         .sheet(item: $shareItem) { item in
             ShareSheet(url: item.url)
         }
+        .sheet(item: $paywallReason) { reason in
+            PaywallView(reason: reason)
+        }
     }
 
     // MARK: - Report (feature C)
@@ -90,6 +95,10 @@ struct DashboardView: View {
     // every option here is a decision a tired parent has to make in a waiting room.
     private var reportCard: some View {
         Button {
+            guard purchases.isPro else {
+                paywallReason = .report
+                return
+            }
             guard let active = childStore.activeChild, !isBuildingReport else { return }
             isBuildingReport = true
             let report = ReportBuilder.build(for: active)
@@ -396,6 +405,7 @@ struct DashboardView: View {
 
     DashboardView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

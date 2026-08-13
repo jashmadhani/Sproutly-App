@@ -142,6 +142,7 @@ struct AddMilestoneSheet: View {
 #Preview {
     AddMilestoneSheet(child: Child(name: "Aanya", birthDate: .now))
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }

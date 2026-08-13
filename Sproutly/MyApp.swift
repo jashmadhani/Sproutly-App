@@ -86,12 +86,14 @@ private func archiveExistingStore() {
 struct MyApp: App {
     @State private var childStore = ChildStore(context: sharedAppContainer.mainContext)
     @State private var themeManager = ThemeManager()
+    @State private var purchases = PurchaseManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(childStore)
                 .environment(themeManager)
+                .environment(purchases)
                 .preferredColorScheme(themeManager.preferredColorScheme)
         }
         .modelContainer(sharedAppContainer)
@@ -103,6 +105,7 @@ struct MyApp: App {
 struct ContentView: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
+    @Environment(PurchaseManager.self) private var purchases
     @State private var hasImported = false
 
     var body: some View {
@@ -119,6 +122,10 @@ struct ContentView: View {
             hasImported = true
             // Adopts any pre-multi-child data into a real Child.
             childStore.importLegacyProfileIfNeeded()
+
+            // Silent restore: the second parent on Family Sharing, or anyone who
+            // reinstalled, must never be shown a paywall for something already owned.
+            await purchases.start()
         }
     }
 }

@@ -110,6 +110,7 @@ struct AssistantView: View {
 
     AssistantView()
         .environment(previewChildStore)
+        .environment(PurchaseManager())
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
