@@ -45,7 +45,7 @@ struct DashboardView: View {
             AmbientBackground(nightMode: theme.isNightMode)
 
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: Theme.sectionSpacing) {
                     headerCard
                     progressCard
                     if viewModel.hasDevelopmentFocus {
@@ -237,17 +237,17 @@ struct DashboardView: View {
 
     private var categoryOverview: some View {
         let columns = [
-            GridItem(.flexible(), spacing: 14),
-            GridItem(.flexible(), spacing: 14)
+            GridItem(.flexible(), spacing: Theme.itemSpacing),
+            GridItem(.flexible(), spacing: Theme.itemSpacing)
         ]
 
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: Theme.itemSpacing) {
             Text("Growth Domains")
                 .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(theme.text)
                 .padding(.leading, 4)
 
-            LazyVGrid(columns: columns, spacing: 14) {
+            LazyVGrid(columns: columns, spacing: Theme.itemSpacing) {
                 ForEach(MilestoneCategory.allCases, id: \.self) { category in
                     domainTile(category)
                 }
@@ -300,11 +300,17 @@ struct DashboardView: View {
             // An opaque pastel plate, not a translucent tint — at low opacity
             // directly over AmbientBackground's blurred circles the tiles read
             // as muddy and blend into the page instead of standing apart as cards.
+            // The border is a second, color-independent guarantee of a visible
+            // edge — opacity alone depends on how close the domain color's
+            // lightness sits to the page background, which varies by hue and
+            // by display; a stroke never disappears regardless.
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(theme.isNightMode ? Theme.nightCard : .white)
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(domainColor.opacity(theme.isNightMode ? 0.32 : 0.28))
+                    .fill(domainColor.opacity(theme.isNightMode ? 0.38 : 0.34))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(domainColor.opacity(theme.isNightMode ? 0.5 : 0.4), lineWidth: 1.5)
             }
         )
         // Two-column grid tile — same reasoning as the milestone ring: capped

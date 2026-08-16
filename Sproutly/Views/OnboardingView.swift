@@ -94,6 +94,7 @@ private extension OnboardingView {
                     content()
                     Spacer(minLength: 0)
                 }
+                .frame(maxWidth: .infinity)
                 .padding()
                 .frame(minHeight: geo.size.height)
             }

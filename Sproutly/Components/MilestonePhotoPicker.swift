@@ -15,6 +15,12 @@ struct MilestonePhotoPicker: View {
 
     @State private var selection: PhotosPickerItem?
 
+    // Shown exactly once — a parent's first time in this sheet after Pro
+    // unlocks the photo feature, so they notice it's here at all rather than
+    // needing to already know to look. Never shown again after that.
+    private static let hasSeenHintKey = "sproutly_has_seen_photo_hint"
+    @State private var showNewHint = !UserDefaults.standard.bool(forKey: MilestonePhotoPicker.hasSeenHintKey)
+
     var body: some View {
         // Copied into locals first: Data and Bool are Sendable, so the label
         // closure below captures values rather than reaching back into self.
@@ -22,9 +28,20 @@ struct MilestonePhotoPicker: View {
         let isNight = nightMode
 
         VStack(alignment: .leading, spacing: 8) {
-            Label("Add a photo", systemImage: "photo")
-                .font(Theme.sproutlyCardTitle)
-                .foregroundStyle(Theme.accentBlue(for: isNight))
+            HStack(spacing: 8) {
+                Label("Add a photo", systemImage: "photo")
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(Theme.accentBlue(for: isNight))
+
+                if showNewHint {
+                    Text("New")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Theme.accentBlue(for: isNight)))
+                }
+            }
 
             PhotosPicker(selection: $selection, matching: .images, photoLibrary: .shared()) {
                 PickerLabel(imageData: currentData, nightMode: isNight)
@@ -46,6 +63,9 @@ struct MilestonePhotoPicker: View {
         .task(id: selection) {
             guard let selection else { return }
             imageData = try? await selection.loadTransferable(type: Data.self)
+        }
+        .onAppear {
+            UserDefaults.standard.set(true, forKey: Self.hasSeenHintKey)
         }
     }
 }

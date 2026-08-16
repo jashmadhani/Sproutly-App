@@ -27,6 +27,7 @@ struct SettingsView: View {
         case addChild
         case aboutData
         case appIcon
+        case proFeatures
         case paywall(PaywallReason)
 
         var id: String {
@@ -34,6 +35,7 @@ struct SettingsView: View {
             case .addChild:          return "addChild"
             case .aboutData:         return "aboutData"
             case .appIcon:           return "appIcon"
+            case .proFeatures:       return "proFeatures"
             case .paywall(let r):    return "paywall-\(r.id)"
             }
         }
@@ -51,12 +53,15 @@ struct SettingsView: View {
             AmbientBackground(nightMode: theme.isNightMode)
             
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     headerSection
                     nightModeCard
                     childrenSection
                     profileSection
                     prematuritySection
+                    if purchases.isPro {
+                        proFeaturesSection
+                    }
                     appIconSection
                     aboutSection
                     dataSection
@@ -129,6 +134,7 @@ struct SettingsView: View {
             case .addChild:       AddChildSheet()
             case .aboutData:      AboutDataView()
             case .appIcon:        AppIconPickerView()
+            case .proFeatures:    ProFeaturesView()
             case .paywall(let r): PaywallView(reason: r)
             }
         }
@@ -372,6 +378,30 @@ struct SettingsView: View {
         .animation(.spring(response: 0.4), value: child.isPremature)
     }
     
+    // MARK: - Pro Features
+
+    // Only shown once Pro is owned — the durable answer to "what did I buy
+    // and where do I use it," reachable any time without hunting.
+    private var proFeaturesSection: some View {
+        Button {
+            activeSheet = .proFeatures
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(theme.proGold)
+                Text("Pro Features")
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(theme.text)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .warmCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - App Icon
 
     // Reach-triggered like every other gate: a free parent taps this and gets
@@ -431,7 +461,11 @@ struct SettingsView: View {
     // MARK: - Data Management
     
     private var dataSection: some View {
-        VStack(spacing: 12) {
+        // Reset and Delete are each their own full-width card, same visual
+        // weight as every other card on this screen — they were the one
+        // place still using itemSpacing, which is what made the gap here
+        // read as tighter than everywhere else.
+        VStack(spacing: Theme.sectionSpacing) {
             Button {
                 showResetAlert = true
             } label: {

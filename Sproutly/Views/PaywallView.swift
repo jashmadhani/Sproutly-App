@@ -111,27 +111,8 @@ struct PaywallView: View {
     }
 
     private var featureList: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            ForEach(PaywallReason.allFeatures, id: \.title) { feature in
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: feature.icon)
-                        .font(.system(size: 17))
-                        .foregroundStyle(theme.blue)
-                        .frame(width: 26)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(feature.title)
-                            .font(Theme.sproutlyCardTitle)
-                            .foregroundStyle(theme.text)
-                        Text(feature.detail)
-                            .font(Theme.sproutlyMeta)
-                            .foregroundStyle(theme.textSecondary)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .warmCard(nightMode: theme.isNightMode)
+        ProFeatureListView()
+            .warmCard(nightMode: theme.isNightMode)
     }
 
     private var loadFailed: Bool {

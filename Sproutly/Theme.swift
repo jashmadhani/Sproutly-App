@@ -166,14 +166,16 @@ enum Theme {
     // and nothing else. Deliberately kept out of the sage family's naming so they
     // don't get reached for as a general accent.
 
-    /// Top stop of the unlock button gradient — #43815F, ~4.6:1 with white.
-    static let ctaGreenTop = Color(hex: 0x43815F)
+    /// Top stop of the unlock button gradient — #4A7A5C. Softened from the
+    /// original #43815F/#2E5F44 pair, which read as a saturated "jewelry
+    /// store" green sitting next to the gold mark — same purpose, quieter.
+    static let ctaGreenTop = Color(hex: 0x4A7A5C)
 
-    /// Bottom stop — #2E5F44. Darker, so the fill reads as lit from above.
-    static let ctaGreenBottom = Color(hex: 0x2E5F44)
+    /// Bottom stop — #355F45. Darker, so the fill reads as lit from above.
+    static let ctaGreenBottom = Color(hex: 0x355F45)
 
-    static let ctaGreenTopNight = Color(hex: 0x3E8F6A)
-    static let ctaGreenBottomNight = Color(hex: 0x2C6B50)
+    static let ctaGreenTopNight = Color(hex: 0x4A9370)
+    static let ctaGreenBottomNight = Color(hex: 0x3A7058)
 
     static func ctaGradient(for nightMode: Bool) -> LinearGradient {
         LinearGradient(
@@ -200,11 +202,14 @@ enum Theme {
     // deliberately deeper than the night one: light gold on the cream background
     // has almost no contrast.
 
-    /// Deep gold for day mode — #B8860B territory, legible on cream.
-    static let proGoldDay = Color(hex: 0xC9982F)
+    /// Muted bronze for day mode — #B8935A. Softened from the original
+    /// #C9982F, which read as bright/high-chroma gold against the sage
+    /// background rather than a quiet "this is special" cue.
+    static let proGoldDay = Color(hex: 0xB8935A)
 
-    /// The existing nightGold, which already reads well on deep navy.
-    static let proGoldNight = nightGold
+    /// Softened from the original nightGold #E6C977 to match the day
+    /// bronze's lower saturation.
+    static let proGoldNight = Color(hex: 0xD4B876)
 
     static func proGold(for nightMode: Bool) -> Color {
         nightMode ? proGoldNight : proGoldDay
@@ -291,6 +296,17 @@ enum Theme {
     static let cardPadding: CGFloat = 14
     static let padding: CGFloat = 16
     static let largePadding: CGFloat = 24
+
+    /// Space between independent top-level cards/sections — Home's card
+    /// stack, Settings' cards, Milestones' domain cards. Every full-width
+    /// bento block on any screen is this far from its neighbor, full stop.
+    static let sectionSpacing: CGFloat = 28
+
+    /// Space between closely-grouped sub-items living *inside* one card —
+    /// the Growth Domains tiles, rows inside a domain card, Recent Moments
+    /// rows. Tighter than sectionSpacing on purpose: these read as one group,
+    /// not as separate cards.
+    static let itemSpacing: CGFloat = 12
     
     // MARK: - Celebration Microcopy
     

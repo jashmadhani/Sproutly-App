@@ -4,6 +4,7 @@ Apple Human Interface Guidelines for iPhone apps — layout, navigation, typogra
 
 **Reference:** https://developer.apple.com/design/human-interface-guidelines
 
+## Rule Categories
 
 | # | Category | Impact | Rules |
 |---|----------|--------|-------|

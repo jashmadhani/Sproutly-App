@@ -77,10 +77,6 @@ struct MilestonesView: View {
         }
     }
 
-    private var groupedMilestones: [String: [Milestone]] {
-        Dictionary(grouping: filteredMilestones, by: \.category)
-    }
-
     // MARK: - Body
 
     var body: some View {
@@ -88,7 +84,7 @@ struct MilestonesView: View {
             AmbientBackground(nightMode: theme.isNightMode)
 
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: Theme.sectionSpacing) {
                     headerSection
                     filterPicker
                     domainGroups
@@ -146,7 +142,7 @@ struct MilestonesView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Milestones")
                     .font(.sproutlyDisplay(30))
@@ -168,9 +164,30 @@ struct MilestonesView: View {
                     paywallReason = .customMilestone
                 }
             } label: {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(theme.blue)
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Add moment")
+                        .font(Theme.sproutlyMeta)
+                        .fontWeight(.semibold)
+                    // A free parent taps this and lands on the paywall — the
+                    // lock says so up front instead of the tap being a
+                    // surprise. Matches the "Pro" badge convention used on
+                    // the App Icon row in Settings.
+                    if !purchases.isPro {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2.weight(.semibold))
+                    }
+                }
+                .foregroundStyle(theme.blue)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule().fill(theme.blue.opacity(0.18))
+                )
+                .overlay(
+                    Capsule().strokeBorder(theme.blue.opacity(0.35), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Add a moment")
@@ -210,14 +227,18 @@ struct MilestonesView: View {
     // MARK: - Domain Groups
 
     private var domainGroups: some View {
-        let grouped = groupedMilestones
+        // Computed once and reused — groupedMilestones and the emptiness
+        // check were each independently re-filtering and re-sorting the
+        // same milestone list.
+        let filtered = filteredMilestones
+        let grouped = Dictionary(grouping: filtered, by: \.category)
         let showAll = selectedFilter == .thisStage || selectedFilter == .all
-        let isEmpty = filteredMilestones.isEmpty
+        let isEmpty = filtered.isEmpty
 
         // LazyVStack, not VStack — with every domain expanded by default this
         // was building all ~80 milestone rows synchronously the instant the
         // tab appeared, which is what showed up as a brief hitch on tap.
-        return LazyVStack(spacing: 12) {
+        return LazyVStack(spacing: Theme.sectionSpacing) {
             ForEach(MilestoneCategory.allCases, id: \.self) { category in
                 let domainMilestones = grouped[category.rawValue] ?? []
                 let completedCount = domainMilestones.filter(\.isCompleted).count
@@ -294,7 +315,7 @@ struct MilestonesView: View {
 
             // Expanded milestone rows
             if isExpanded {
-                VStack(spacing: 8) {
+                VStack(spacing: Theme.itemSpacing) {
                     if milestones.isEmpty {
                         Text("No milestones in this filter.")
                             .font(Theme.sproutlyBody)
@@ -322,14 +343,7 @@ struct MilestonesView: View {
 
     private func milestoneRow(_ milestone: Milestone) -> some View {
         HStack(spacing: 12) {
-            if let image = PhotoStore.image(named: milestone.photoFilename) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityHidden(true)
-            }
+            MilestoneThumbnail(filename: milestone.photoFilename)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(milestone.title)
@@ -531,14 +545,25 @@ struct MilestonesView: View {
                     commitToggle(milestone, note: noteText.trimmingCharacters(in: .whitespacesAndNewlines))
                     resetSheetState()
                 } label: {
-                    Text("Save Memory")
-                        .font(Theme.sproutlyCardTitle)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(theme.ctaGradient)
+                    // A saturated white-on-solid-green button (the paywall's
+                    // treatment) reads as a purchase CTA, not a save action —
+                    // and put a second, different green next to the heart
+                    // icon's theme.green a few lines up. This stays in the
+                    // same pastel-on-light language as Skip and everything
+                    // else in the app, just tinted to read as the affirmative
+                    // choice — dark green text on a soft green tint, matching
+                    // the low-contrast, low-drama visual language everywhere else.
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark")
+                        Text("Save Memory")
+                    }
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(theme.isNightMode ? Theme.ctaGreenBottomNight : Theme.ctaGreenBottom)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(theme.green.opacity(theme.isNightMode ? 0.24 : 0.16))
                         )
                 }
                 .buttonStyle(.plain)
@@ -589,6 +614,37 @@ struct MilestonesView: View {
         let ctx = modelContext
         Task.detached { @MainActor in
             try? ctx.save()
+        }
+    }
+}
+
+// MARK: - Milestone Thumbnail
+
+// Decoding a JPEG off disk is real work — doing it synchronously inside a
+// row's body (the previous approach) ran on the main thread on every render,
+// which is exactly the kind of thing that's invisible on a Mac's SSD/CPU in
+// Simulator but shows up as a stutter on an actual phone. Loaded async here
+// instead, matching the pattern MilestonePhotoPicker already uses.
+private struct MilestoneThumbnail: View {
+    let filename: String?
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+        }
+        .task(id: filename) {
+            guard let filename else { image = nil; return }
+            image = await Task.detached(priority: .userInitiated) {
+                PhotoStore.image(named: filename)
+            }.value
         }
     }
 }

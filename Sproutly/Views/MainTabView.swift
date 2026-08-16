@@ -11,7 +11,11 @@ import SwiftData
 
 struct MainTabView: View {
     @Environment(ThemeManager.self) private var theme
+    @Environment(PurchaseManager.self) private var purchases
     @State private var selectedTab: Tab = .dashboard
+    @State private var showProWelcome = false
+
+    private static let hasSeenProWelcomeKey = "sproutly_has_seen_pro_welcome"
 
     enum Tab: String, CaseIterable {
         case dashboard = "Home"
@@ -54,6 +58,20 @@ struct MainTabView: View {
         .transaction { $0.animation = nil }
         .safeAreaInset(edge: .bottom) {
             floatingDock
+        }
+        .onChange(of: purchases.isPro) { wasPro, isPro in
+            guard isPro, !wasPro else { return }
+            guard !UserDefaults.standard.bool(forKey: Self.hasSeenProWelcomeKey) else { return }
+            UserDefaults.standard.set(true, forKey: Self.hasSeenProWelcomeKey)
+            // A beat after the paywall's own dismiss animation finishes,
+            // rather than two sheets fighting to present at once.
+            Task {
+                try? await Task.sleep(for: .seconds(0.5))
+                showProWelcome = true
+            }
+        }
+        .sheet(isPresented: $showProWelcome) {
+            ProWelcomeView()
         }
     }
 
