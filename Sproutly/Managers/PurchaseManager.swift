@@ -113,7 +113,15 @@ final class PurchaseManager {
                 state = .idle
             }
         } catch {
-            state = .failed(error.localizedDescription)
+            // product.purchase() can throw even after StoreKit has already recorded
+            // the transaction (seen with sandbox/local test purchases) — a thrown
+            // error here is not proof nothing happened. Re-check before trusting the
+            // failure message, otherwise a real purchase gets stuck behind a paywall
+            // that never looks again until the app happens to background/foreground.
+            await refreshEntitlements()
+            if !isPro {
+                state = .failed(error.localizedDescription)
+            }
         }
     }
 

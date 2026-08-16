@@ -53,6 +53,17 @@ struct OnboardingView: View {
                 navigationButtons
             }
         }
+        // Without this, the keyboard's safe-area inset pushes the ENTIRE
+        // VStack up — Back/Get Started included — while the profile step's
+        // ScrollView separately auto-scrolls to keep the focused field
+        // visible. Two independent adjustments fighting each other is what
+        // produced the hard seam right above the buttons: the ScrollView's
+        // rounded card got clipped flat at its shrunk bottom edge. Freezing
+        // the outer layout in place means only the ScrollView reflows for
+        // the keyboard, and Back/Get Started stay exactly where they always
+        // are — same fix you proposed, the keyboard simply overlays instead
+        // of shoving the chrome around.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onTapGesture { isNameFieldFocused = false }
     }
 }

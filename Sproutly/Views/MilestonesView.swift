@@ -44,6 +44,9 @@ struct MilestonesView: View {
     @State private var showDeleteMilestoneAlert: Bool = false
     @State private var shareItem: ShareItem? = nil
     @State private var paywallReason: PaywallReason? = nil
+    @Namespace private var photoZoomNamespace
+    @State private var expandedPhotoMilestone: Milestone? = nil
+    @State private var expandedPhotoImage: UIImage? = nil
 
     // MARK: - Derived Data
 
@@ -94,6 +97,44 @@ struct MilestonesView: View {
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
+
+            // Full-screen photo zoom. Lives at this level, not inside the row,
+            // because it needs to cover the whole screen — a matchedGeometryEffect
+            // pair needs both ends visible in the same view hierarchy, which a
+            // row nested in a ScrollView can't provide on its own.
+            if let milestone = expandedPhotoMilestone {
+                ZStack {
+                    Color.black.opacity(0.92)
+                        .ignoresSafeArea()
+                        .onTapGesture { collapsePhoto() }
+
+                    if let expandedPhotoImage {
+                        Image(uiImage: expandedPhotoImage)
+                            .resizable()
+                            .scaledToFit()
+                            .matchedGeometryEffect(id: milestone.id, in: photoZoomNamespace)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .padding(24)
+                            .onTapGesture { collapsePhoto() }
+                            .gesture(
+                                DragGesture().onEnded { value in
+                                    if value.translation.height > 80 { collapsePhoto() }
+                                }
+                            )
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(1)
+            }
+        }
+        .task(id: expandedPhotoMilestone?.photoFilename) {
+            guard let filename = expandedPhotoMilestone?.photoFilename else {
+                expandedPhotoImage = nil
+                return
+            }
+            expandedPhotoImage = await Task.detached(priority: .userInitiated) {
+                PhotoStore.image(named: filename)
+            }.value
         }
         .sheet(item: $milestoneForNote) { milestone in
             completionNoteSheet(for: milestone)
@@ -343,7 +384,16 @@ struct MilestonesView: View {
 
     private func milestoneRow(_ milestone: Milestone) -> some View {
         HStack(spacing: 12) {
-            MilestoneThumbnail(filename: milestone.photoFilename)
+            MilestoneThumbnail(
+                milestone: milestone,
+                namespace: photoZoomNamespace,
+                isExpanded: expandedPhotoMilestone?.id == milestone.id
+            ) {
+                expandedPhotoImage = nil
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    expandedPhotoMilestone = milestone
+                }
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(milestone.title)
@@ -496,7 +546,18 @@ struct MilestonesView: View {
                 )
             } else {
                 Button {
-                    paywallReason = .photo
+                    // Presenting a second .sheet while this completion sheet
+                    // is still on screen forces SwiftUI to dismiss-then-
+                    // present sequentially — two full sheet animations
+                    // chained is exactly what read as "takes a long time to
+                    // appear." Dismissing first and presenting the paywall
+                    // once that animation finishes is one clean transition
+                    // instead of two stacked ones.
+                    resetSheetState()
+                    Task {
+                        try? await Task.sleep(for: .seconds(0.35))
+                        paywallReason = .photo
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "photo.badge.plus")
@@ -616,6 +677,12 @@ struct MilestonesView: View {
             try? ctx.save()
         }
     }
+
+    private func collapsePhoto() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            expandedPhotoMilestone = nil
+        }
+    }
 }
 
 // MARK: - Milestone Thumbnail
@@ -626,22 +693,38 @@ struct MilestonesView: View {
 // Simulator but shows up as a stutter on an actual phone. Loaded async here
 // instead, matching the pattern MilestonePhotoPicker already uses.
 private struct MilestoneThumbnail: View {
-    let filename: String?
+    let milestone: Milestone
+    let namespace: Namespace.ID
+    let isExpanded: Bool
+    let onTap: () -> Void
     @State private var image: UIImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityHidden(true)
+                Button(action: onTap) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                // Hidden while its full-screen counterpart is showing —
+                // matchedGeometryEffect expects exactly one visible instance
+                // of a given id at a time; leaving both visible causes the
+                // effect to snap instead of animating smoothly.
+                .opacity(isExpanded ? 0 : 1)
+                .matchedGeometryEffect(id: milestone.id, in: namespace, isSource: !isExpanded)
+                .accessibilityLabel("View photo for \(milestone.title)")
             }
         }
-        .task(id: filename) {
-            guard let filename else { image = nil; return }
+        .task(id: milestone.photoFilename) {
+            guard let filename = milestone.photoFilename else { image = nil; return }
             image = await Task.detached(priority: .userInitiated) {
                 PhotoStore.image(named: filename)
             }.value

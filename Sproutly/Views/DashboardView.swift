@@ -101,11 +101,18 @@ struct DashboardView: View {
             }
             guard let active = childStore.activeChild, !isBuildingReport else { return }
             isBuildingReport = true
-            let report = ReportBuilder.build(for: active)
-            if let url = ShareRenderer.pdf(for: report) {
-                shareItem = ShareItem(url: url)
+            // Rendering is synchronous CPU work on the main actor (ImageRenderer
+            // requires it). Without yielding first, SwiftUI never gets a frame
+            // to paint the spinner before the freeze — the button just looks
+            // hung until the PDF pops out. One yield lets that frame land.
+            Task { @MainActor in
+                await Task.yield()
+                let report = ReportBuilder.build(for: active)
+                if let url = ShareRenderer.pdf(for: report) {
+                    shareItem = ShareItem(url: url)
+                }
+                isBuildingReport = false
             }
-            isBuildingReport = false
         } label: {
             HStack(spacing: 14) {
                 ZStack {

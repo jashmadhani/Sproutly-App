@@ -20,7 +20,24 @@ struct AddMilestoneSheet: View {
     @State private var category: MilestoneCategory = .socialEmotional
     @State private var alreadyHappened: Bool = true
     @State private var note: String = ""
+    @State private var ageMonth: Int
     @FocusState private var isTitleFocused: Bool
+
+    init(child: Child) {
+        self.child = child
+        _ageMonth = State(initialValue: max(0, child.calculateCorrectedAge()))
+    }
+
+    private var ageMonthText: String {
+        if ageMonth < 24 {
+            return "\(ageMonth) month\(ageMonth == 1 ? "" : "s")"
+        }
+        let years = ageMonth / 12
+        let remainder = ageMonth % 12
+        return remainder == 0
+            ? "\(years) year\(years == 1 ? "" : "s")"
+            : "\(years)y \(remainder)m"
+    }
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -65,6 +82,19 @@ struct AddMilestoneSheet: View {
                             Text("This is just for grouping — your own moments never affect how Sproutly reads your child's development.")
                                 .font(Theme.sproutlyMeta)
                                 .foregroundStyle(theme.textSecondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How old were they?")
+                                .font(Theme.sproutlyMeta)
+                                .foregroundStyle(theme.textSecondary)
+
+                            Stepper(value: $ageMonth, in: 0...72) {
+                                Text(ageMonthText)
+                                    .font(Theme.sproutlyCardTitle)
+                                    .foregroundStyle(theme.text)
+                            }
+                            .tint(theme.green)
                         }
 
                         Toggle(isOn: $alreadyHappened) {
@@ -121,9 +151,10 @@ struct AddMilestoneSheet: View {
         let milestone = Milestone(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             category: category.rawValue,
-            // Stamped with the child's age now, so it sits in the right place on
-            // the timeline. It is never treated as an expectation.
-            ageMonth: max(0, child.calculateCorrectedAge()),
+            // Parent-chosen, defaulting to the child's current age — lets a
+            // moment recorded in retrospect sit at the right point on the
+            // timeline. It is never treated as an expectation (isUserCreated).
+            ageMonth: ageMonth,
             isCompleted: alreadyHappened,
             dateCompleted: alreadyHappened ? Date() : nil,
             completionNote: alreadyHappened

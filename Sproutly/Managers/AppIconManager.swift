@@ -52,16 +52,16 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Preview asset. ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS puts every
-    /// .appiconset into the bundle as a loadable image, so the picker can preview
-    /// the primary icon directly instead of keeping a duplicate imageset around.
+    /// Preview asset. .appiconset entries are a distinct catalog category and
+    /// are not resolvable by name through Image(_:)/UIImage(named:), so each
+    /// icon has a matching plain imageset (same artwork) just for this picker.
     var previewAssetName: String {
         switch self {
-        case .classic: return "AppIcon"
-        case .sprout:  return "AppIconSprout"
-        case .twin:    return "AppIconTwin"
-        case .night:   return "AppIconNight"
-        case .sage:    return "AppIconSage"
+        case .classic: return "AppIconClassicPreview"
+        case .sprout:  return "AppIconSproutPreview"
+        case .twin:    return "AppIconTwinPreview"
+        case .night:   return "AppIconNightPreview"
+        case .sage:    return "AppIconSagePreview"
         }
     }
 }

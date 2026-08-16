@@ -417,32 +417,40 @@ struct AmbientBackground: View {
     let nightMode: Bool
 
     var body: some View {
-        ZStack {
+        // Positions and sizes are fractions of the actual screen, computed via
+        // GeometryReader, not fixed point offsets. The previous version was
+        // tuned by eye against one simulator width — on a physically wider or
+        // narrower iPhone (SE through Pro Max all ship in this app's supported
+        // range), the same fixed offsets leave a different amount of flat,
+        // un-shaded background on each side, which reads as asymmetric padding
+        // even though every actual content .padding() is untouched and
+        // symmetric. Scaling with geo.size fixes that regardless of device.
+        GeometryReader { geo in
+            ZStack {
+                Theme.background(for: nightMode)
 
-            Theme.background(for: nightMode)
-                .ignoresSafeArea()
+                // Blurred rather than flat-edged — at full opacity+sharp edges
+                // these read as three overlapping discs with visible seams
+                // where they cross; blurring dissolves that into soft ambient
+                // glow while keeping the same playful multi-color concept.
+                Circle()
+                    .fill(Theme.accentBlue(for: nightMode).opacity(nightMode ? 0.05 : 0.09))
+                    .frame(width: geo.size.width * 1.02, height: geo.size.width * 1.02)
+                    .position(x: geo.size.width * 0.207, y: geo.size.height * 0.265)
+                    .blur(radius: 70)
 
-            // Blurred rather than flat-edged — at full opacity+sharp edges
-            // these read as three overlapping discs with visible seams where
-            // they cross; blurring dissolves that into soft ambient glow
-            // while keeping the same playful multi-color "growing" concept.
-            Circle()
-                .fill(Theme.accentBlue(for: nightMode).opacity(nightMode ? 0.05 : 0.09))
-                .frame(width: 400, height: 400)
-                .offset(x: -115, y: -200)
-                .blur(radius: 70)
+                Circle()
+                    .fill(Theme.growthGreen(for: nightMode).opacity(nightMode ? 0.04 : 0.08))
+                    .frame(width: geo.size.width * 1.07, height: geo.size.width * 1.07)
+                    .position(x: geo.size.width * 0.818, y: geo.size.height * 0.764)
+                    .blur(radius: 70)
 
-            Circle()
-                .fill(Theme.growthGreen(for: nightMode).opacity(nightMode ? 0.04 : 0.08))
-                .frame(width: 420, height: 420)
-                .offset(x: 125, y: 225)
-                .blur(radius: 70)
-
-            Circle()
-                .fill(Theme.encourageYellow(for: nightMode).opacity(nightMode ? 0.03 : 0.07))
-                .frame(width: 300, height: 300)
-                .offset(x: 75, y: -10)
-                .blur(radius: 70)
+                Circle()
+                    .fill(Theme.encourageYellow(for: nightMode).opacity(nightMode ? 0.03 : 0.07))
+                    .frame(width: geo.size.width * 0.76, height: geo.size.width * 0.76)
+                    .position(x: geo.size.width * 0.691, y: geo.size.height * 0.488)
+                    .blur(radius: 70)
+            }
         }
         .ignoresSafeArea()
     }

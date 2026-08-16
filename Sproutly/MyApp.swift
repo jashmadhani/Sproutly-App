@@ -110,6 +110,7 @@ struct ContentView: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
     @Environment(PurchaseManager.self) private var purchases
+    @Environment(\.scenePhase) private var scenePhase
     @State private var hasImported = false
 
     var body: some View {
@@ -130,6 +131,14 @@ struct ContentView: View {
             // Silent restore: the second parent on Family Sharing, or anyone who
             // reinstalled, must never be shown a paywall for something already owned.
             await purchases.start()
+        }
+        // CLAUDE.md's own stated intent is "re-checked every launch" — but a
+        // resume from background isn't a launch, and isPro was only ever set
+        // at the initial .task above or after a transaction event. Re-checking
+        // on every foreground transition closes that gap defensively.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active, hasImported else { return }
+            Task { await purchases.refreshEntitlements() }
         }
     }
 }

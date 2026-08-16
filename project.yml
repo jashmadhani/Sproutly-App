@@ -42,10 +42,7 @@ targets:
         # Info.plist. The names must match the .appiconset folder names
         # exactly — a typo fails silently at runtime with setAlternateIconName
         # returning an error rather than a build failure.
-        # Re-enable once the icon art lands. Listing a name with no matching
-        # .appiconset fails the asset-catalog build, so this stays commented
-        # until the folders exist.
-        # ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconSprout AppIconTwin AppIconNight AppIconSage
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconSprout AppIconTwin AppIconNight AppIconSage
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
 
         # Info.plist is generated from these keys (modern Xcode style —
