@@ -62,8 +62,12 @@ struct MilestonesView: View {
         switch selectedFilter {
         case .thisStage:
             // Their own moments always show — a parent who just added one should
-            // never have to hunt for it behind a filter.
-            return milestones.filter { $0.ageMonth == targetAgeMonth || $0.isUserCreated }
+            // never have to hunt for it behind a filter. Completed ones move to
+            // the Completed tab instead of lingering here struck through —
+            // "This Stage" is the to-do list, not the full history.
+            return milestones.filter {
+                ($0.ageMonth == targetAgeMonth || $0.isUserCreated) && !$0.isCompleted
+            }
         case .all:
             return milestones
         case .completed:
@@ -145,14 +149,13 @@ struct MilestonesView: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Milestones")
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.sproutlyDisplay(30))
                     .foregroundStyle(theme.text)
 
                 // Naming the child here is what stops a parent logging against the
                 // wrong one after switching.
                 Text("\(child.displayName) · \(ageDescription)")
-                    .font(.subheadline)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
             }
 
@@ -211,7 +214,10 @@ struct MilestonesView: View {
         let showAll = selectedFilter == .thisStage || selectedFilter == .all
         let isEmpty = filteredMilestones.isEmpty
 
-        return VStack(spacing: 12) {
+        // LazyVStack, not VStack — with every domain expanded by default this
+        // was building all ~80 milestone rows synchronously the instant the
+        // tab appeared, which is what showed up as a brief hitch on tap.
+        return LazyVStack(spacing: 12) {
             ForEach(MilestoneCategory.allCases, id: \.self) { category in
                 let domainMilestones = grouped[category.rawValue] ?? []
                 let completedCount = domainMilestones.filter(\.isCompleted).count
@@ -262,21 +268,23 @@ struct MilestonesView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(category.gentleLabel)
-                            .font(.subheadline.weight(.medium))
+                            .font(Theme.sproutlyCardTitle)
                             .foregroundStyle(theme.text)
 
                         Text("\(stats.completed) of \(stats.total)")
-                            .font(.caption)
+                            .font(Theme.sproutlyMeta)
                             .foregroundStyle(theme.textSecondary)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(theme.textSecondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .animation(.easeOut(duration: 0.2), value: isExpanded)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .padding(16)
             }
@@ -289,13 +297,16 @@ struct MilestonesView: View {
                 VStack(spacing: 8) {
                     if milestones.isEmpty {
                         Text("No milestones in this filter.")
-                            .font(.caption)
+                            .font(Theme.sproutlyBody)
                             .foregroundStyle(theme.textSecondary)
                             .padding(.bottom, 12)
                     } else {
                         ForEach(milestones) { milestone in
                             milestoneRow(milestone)
-                                .transaction { $0.animation = nil }
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                         }
                     }
                 }
@@ -322,7 +333,7 @@ struct MilestonesView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(milestone.title)
-                    .font(.subheadline)
+                    .font(Theme.sproutlyItemTitle)
                     .foregroundStyle(milestone.isCompleted ? theme.textSecondary : theme.text)
                     .strikethrough(milestone.isCompleted, color: theme.green.opacity(0.8))
 
@@ -331,19 +342,19 @@ struct MilestonesView: View {
                 // styling otherwise — these are not a separate kind of thing.
                 if milestone.isUserCreated {
                     Label("Your moment", systemImage: "heart.fill")
-                        .font(.caption2)
+                        .font(Theme.sproutlyMeta)
                         .foregroundStyle(theme.blue.opacity(0.8))
                 } else {
                     Text(milestone.expectedAgeText)
-                        .font(.caption2)
+                        .font(Theme.sproutlyMeta)
                         .foregroundStyle(theme.textSecondary)
                 }
 
                 // Show completion note if present
                 if milestone.isCompleted && !milestone.completionNote.isEmpty {
                     Text(milestone.completionNote)
-                        .font(.caption2)
-                        .foregroundStyle(theme.textSecondary.opacity(0.8))
+                        .font(Theme.sproutlyMeta)
+                        .foregroundStyle(theme.textSecondary)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
                         .italic()
@@ -366,8 +377,8 @@ struct MilestonesView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
                     milestone.isCompleted
-                        ? theme.green.opacity(theme.isNightMode ? 0.06 : 0.04)
-                        : theme.text.opacity(0.02)
+                        ? theme.green.opacity(theme.isNightMode ? 0.14 : 0.10)
+                        : theme.text.opacity(theme.isNightMode ? 0.08 : 0.06)
                 )
         )
         .accessibilityElement(children: .combine)
@@ -431,12 +442,11 @@ struct MilestonesView: View {
                     .foregroundStyle(theme.green)
 
                 Text("Moment Captured!")
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.sproutlyDisplay(24))
                     .foregroundStyle(theme.text)
 
                 Text(milestone.title)
-                    .font(.subheadline)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
             }
@@ -445,12 +455,12 @@ struct MilestonesView: View {
             // Note field
             VStack(alignment: .leading, spacing: 8) {
                 Label("Add a memory", systemImage: "pencil.line")
-                    .font(.caption.weight(.medium))
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.blue)
 
-                TextField("What made this moment special? (optional)", text: $noteText, axis: .vertical)
+                TextField("What made it special? (optional)", text: $noteText, axis: .vertical)
                     .lineLimit(1...3)
-                    .font(.subheadline)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.text)
                     .padding(14)
                     .background(
@@ -477,10 +487,10 @@ struct MilestonesView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "photo.badge.plus")
                         Text("Add a photo")
-                            .font(.subheadline)
+                            .font(Theme.sproutlyCardTitle)
                         Spacer()
                         Image(systemName: "lock.fill")
-                            .font(.caption)
+                            .font(Theme.sproutlyMeta)
                     }
                     .foregroundStyle(theme.textSecondary)
                     .padding(.vertical, 14)
@@ -501,13 +511,13 @@ struct MilestonesView: View {
                     resetSheetState()
                 } label: {
                     Text("Skip")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(theme.textSecondary)
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(theme.text)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(theme.text.opacity(0.05))
+                                .fill(theme.text.opacity(0.08))
                         )
                 }
                 .buttonStyle(.plain)
@@ -522,13 +532,13 @@ struct MilestonesView: View {
                     resetSheetState()
                 } label: {
                     Text("Save Memory")
-                        .font(.subheadline.weight(.semibold))
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(theme.green)
+                                .fill(theme.ctaGradient)
                         )
                 }
                 .buttonStyle(.plain)
@@ -553,9 +563,11 @@ struct MilestonesView: View {
                 milestoneToUncheck = milestone
                 showRemoveAlert = true
             } else {
-                milestone.isCompleted = false
-                milestone.dateCompleted = nil
-                milestone.completionNote = ""
+                withAnimation(.easeOut(duration: 0.3)) {
+                    milestone.isCompleted = false
+                    milestone.dateCompleted = nil
+                    milestone.completionNote = ""
+                }
                 saveContext()
             }
         } else {
@@ -565,9 +577,11 @@ struct MilestonesView: View {
 
 
     private func commitToggle(_ milestone: Milestone, note: String) {
-        milestone.isCompleted = true
-        milestone.dateCompleted = Date()
-        milestone.completionNote = note
+        withAnimation(.easeOut(duration: 0.3)) {
+            milestone.isCompleted = true
+            milestone.dateCompleted = Date()
+            milestone.completionNote = note
+        }
         saveContext()
     }
 

@@ -480,6 +480,6 @@ final class PurchaseManagerTests: XCTestCase {
         for reason in reasons {
             XCTAssertFalse(reason.headline.isEmpty)
         }
-        XCTAssertEqual(PaywallReason.allFeatures.count, 5)
+        XCTAssertEqual(PaywallReason.allFeatures.count, 6)
     }
 }

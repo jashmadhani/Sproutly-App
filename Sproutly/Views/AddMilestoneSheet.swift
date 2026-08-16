@@ -35,7 +35,7 @@ struct AddMilestoneSheet: View {
                     VStack(alignment: .leading, spacing: 22) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("What happened?")
-                                .font(.caption)
+                                .font(Theme.sproutlyMeta)
                                 .foregroundStyle(theme.textSecondary)
 
                             TextField("First swim, said dada…", text: $title)
@@ -51,7 +51,7 @@ struct AddMilestoneSheet: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Which area does it belong to?")
-                                .font(.caption)
+                                .font(Theme.sproutlyMeta)
                                 .foregroundStyle(theme.textSecondary)
 
                             Picker("", selection: $category) {
@@ -63,17 +63,17 @@ struct AddMilestoneSheet: View {
                             .tint(theme.blue)
 
                             Text("This is just for grouping — your own moments never affect how Sproutly reads your child's development.")
-                                .font(.caption2)
-                                .foregroundStyle(theme.textSecondary.opacity(0.8))
+                                .font(Theme.sproutlyMeta)
+                                .foregroundStyle(theme.textSecondary)
                         }
 
                         Toggle(isOn: $alreadyHappened) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Already happened")
-                                    .font(.subheadline)
+                                    .font(Theme.sproutlyCardTitle)
                                     .foregroundStyle(theme.text)
                                 Text("Marks it complete right away")
-                                    .font(.caption)
+                                    .font(Theme.sproutlyMeta)
                                     .foregroundStyle(theme.textSecondary)
                             }
                         }
@@ -82,7 +82,7 @@ struct AddMilestoneSheet: View {
                         if alreadyHappened {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("A note, if you'd like")
-                                    .font(.caption)
+                                    .font(Theme.sproutlyMeta)
                                     .foregroundStyle(theme.textSecondary)
 
                                 TextField("Optional", text: $note, axis: .vertical)

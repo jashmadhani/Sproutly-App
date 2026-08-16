@@ -111,18 +111,18 @@ struct DashboardView: View {
                 ZStack {
                     Circle()
                         .fill(theme.blue.opacity(0.12))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                     Image(systemName: "doc.text")
-                        .font(.system(size: 17))
+                        .font(.system(size: 19))
                         .foregroundStyle(theme.blue)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Report for your visit")
-                        .font(.subheadline.weight(.medium))
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Text("A summary to bring to the pediatrician")
-                        .font(.caption)
+                        .font(Theme.sproutlyBody)
                         .foregroundStyle(theme.textSecondary)
                 }
 
@@ -132,8 +132,10 @@ struct DashboardView: View {
                     ProgressView()
                 } else {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(theme.textSecondary.opacity(0.6))
+                        .font(Theme.sproutlyRowIcon)
+                        .foregroundStyle(theme.blue)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
             }
         }
@@ -148,17 +150,12 @@ struct DashboardView: View {
     private var headerCard: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(viewModel.greetingText)
-                    .font(.subheadline)
-                    .foregroundStyle(theme.textSecondary)
-
-                Text(child.displayName)
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
+                Text("\(child.displayName)’s growth")
+                    .font(.sproutlyDisplay(30))
                     .foregroundStyle(theme.text)
 
                 Text("You're \(child.humanReadableAge)!")
-                    .font(.callout)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
             }
 
@@ -205,24 +202,29 @@ struct DashboardView: View {
                 )
                 .frame(width: 160, height: 160)
 
-                VStack(spacing: 2) {
+                VStack(spacing: 4) {
                     Text("\(viewModel.currentStageCompleted)")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(Theme.sproutlyStatNumber)
                         .foregroundStyle(theme.text)
 
-                    Text("of \(viewModel.currentStageTotal)")
-                        .font(.subheadline)
+                    Text("of \(viewModel.currentStageTotal) milestones")
+                        .font(Theme.sproutlyStatLabel)
                         .foregroundStyle(theme.textSecondary)
-
-                    Text("milestones")
-                        .font(.caption)
-                        .foregroundStyle(theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                 }
+                .frame(maxWidth: 128)
+                // The ring is a fixed-size circle — text inside it can't grow
+                // without bound the way free-flowing text can. Dynamic Type
+                // still scales it (never frozen), just capped past the first
+                // accessibility step so "of 10 milestones" wraps to two lines
+                // inside the circle instead of spilling past its edge.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             }
 
             Text("\(viewModel.targetAgeMonth)-month milestones")
-                .font(.subheadline)
-                .foregroundStyle(theme.textSecondary)
+                .font(Theme.sproutlyCardTitle)
+                .foregroundStyle(theme.text)
         }
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
@@ -241,7 +243,7 @@ struct DashboardView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             Text("Growth Domains")
-                .font(.callout.weight(.semibold))
+                .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(theme.text)
                 .padding(.leading, 4)
 
@@ -273,10 +275,11 @@ struct DashboardView: View {
             }
 
             Text(category.gentleLabel)
-                .font(.callout.weight(.medium))
+                .font(Theme.sproutlyCardTitle)
                 .foregroundStyle(theme.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(minHeight: 44, alignment: .top)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -294,9 +297,20 @@ struct DashboardView: View {
         }
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(domainColor.opacity(theme.isNightMode ? 0.25 : 0.22))
+            // An opaque pastel plate, not a translucent tint — at low opacity
+            // directly over AmbientBackground's blurred circles the tiles read
+            // as muddy and blend into the page instead of standing apart as cards.
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(theme.isNightMode ? Theme.nightCard : .white)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(domainColor.opacity(theme.isNightMode ? 0.32 : 0.28))
+            }
         )
+        // Two-column grid tile — same reasoning as the milestone ring: capped
+        // past the first accessibility step so the label reflows within the
+        // tile instead of truncating with an ellipsis.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(category.gentleLabel), \(stats.completed) of \(stats.total) completed")
     }
@@ -306,7 +320,7 @@ struct DashboardView: View {
     private var recentMomentsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent Moments")
-                .font(.callout.weight(.semibold))
+                .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(theme.text)
                 .padding(.leading, 4)
 
@@ -333,19 +347,19 @@ struct DashboardView: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(milestone.title)
-                                .font(.subheadline.weight(.medium))
+                                .font(Theme.sproutlyCardTitle)
                                 .foregroundStyle(theme.text)
                                 .lineLimit(1)
 
                             if let date = milestone.dateCompleted {
                                 Text(date, format: .dateTime.month(.abbreviated).day())
-                                    .font(.caption)
+                                    .font(Theme.sproutlyMeta)
                                     .foregroundStyle(theme.textSecondary)
                             }
 
                             if !milestone.completionNote.isEmpty {
                                 Text(milestone.completionNote)
-                                    .font(.caption2)
+                                    .font(Theme.sproutlyMeta)
                                     .foregroundStyle(theme.textSecondary)
                                     .lineLimit(1)
                             }

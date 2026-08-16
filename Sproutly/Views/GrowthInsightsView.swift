@@ -17,7 +17,7 @@ struct GrowthInsightsView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Section header
             Label("Growth Insights", systemImage: "lightbulb.fill")
-                .font(.callout.weight(.semibold))
+                .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(Theme.accentBlue(for: nightMode))
 
             // Collapsible educational rows
@@ -93,18 +93,18 @@ struct GrowthInsightsView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: icon)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(Theme.accentBlue(for: nightMode))
                         .frame(width: 20)
 
                     Text(title)
-                        .font(.subheadline.weight(.medium))
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary(for: nightMode))
                         .rotationEffect(.degrees(expandedSection == id ? 90 : 0))
                         .frame(width: 44, height: 44)
@@ -116,7 +116,7 @@ struct GrowthInsightsView: View {
 
             if expandedSection == id {
                 Text(body)
-                    .font(.caption)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)

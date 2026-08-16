@@ -35,11 +35,11 @@ struct SupportAssistantView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Ask Sproutly")
-                        .font(.subheadline.weight(.medium))
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
-                    
+
                     Text("Share a question or concern")
-                        .font(.caption2)
+                        .font(Theme.sproutlyMeta)
                         .foregroundStyle(Theme.textSecondary(for: nightMode))
                 }
                 
@@ -50,9 +50,9 @@ struct SupportAssistantView: View {
             
             // Input field
             HStack(spacing: 10) {
-                TextField("e.g. My child isn't walking yet...", text: $question, axis: .vertical)
+                TextField("What's on your mind today?", text: $question, axis: .vertical)
                     .lineLimit(1...4)
-                    .font(.subheadline)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
                     .focused($isInputFocused)
                     .accessibilityLabel("Question input")
@@ -88,36 +88,36 @@ struct SupportAssistantView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     // Reassurance
                     Text(resp.reassurance)
-                        .font(.subheadline)
+                        .font(Theme.sproutlyBody)
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
                         .fixedSize(horizontal: false, vertical: true)
-                    
+
                     // Activity suggestions
                     if !resp.activities.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Gentle ideas to try:")
-                                .font(.caption.weight(.medium))
+                                .font(Theme.sproutlyCardTitle)
                                 .foregroundStyle(Theme.accentBlue(for: nightMode))
-                            
+
                             ForEach(resp.activities, id: \.self) { activity in
                                 HStack(alignment: .top, spacing: 8) {
                                     Text("•")
-                                        .font(.caption)
+                                        .font(Theme.sproutlyBody)
                                         .foregroundStyle(Theme.growthGreen(for: nightMode))
                                     Text(activity)
-                                        .font(.caption)
+                                        .font(Theme.sproutlyBody)
                                         .foregroundStyle(Theme.textSecondary(for: nightMode))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                         }
                     }
-                    
+
                     // Pediatric note (when appropriate)
                     if let pediatric = resp.pediatricNote {
                         Text(pediatric)
-                            .font(.caption2)
-                            .foregroundStyle(Theme.textSecondary(for: nightMode).opacity(0.8))
+                            .font(Theme.sproutlyBody)
+                            .foregroundStyle(Theme.textSecondary(for: nightMode).opacity(0.9))
                             .padding(.top, 4)
                             .fixedSize(horizontal: false, vertical: true)
                     }

@@ -32,6 +32,11 @@ final class ThemeManager {
     var textSecondary: Color { Theme.textSecondary(for: isNightMode) }
     var blue: Color { Theme.accentBlue(for: isNightMode) }
     var green: Color { Theme.growthGreen(for: isNightMode) }
+    var ctaGradient: LinearGradient { Theme.ctaGradient(for: isNightMode) }
+    var ctaShadow: Color { Theme.ctaShadow(for: isNightMode) }
+    var proGold: Color { Theme.proGold(for: isNightMode) }
+    var proGoldGradient: LinearGradient { Theme.proGoldGradient(for: isNightMode) }
+    var proHaloGradient: RadialGradient { Theme.proHaloGradient(for: isNightMode) }
     var yellow: Color { Theme.encourageYellow(for: isNightMode) }
     
     // domain colors

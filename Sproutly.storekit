@@ -1,11 +1,11 @@
 {
-  "identifier" : "A1B2C3D4",
+  "identifier" : "5EB93883-C19C-4C13-9901-35A0D584A00E",
   "nonRenewingSubscriptions" : [],
   "products" : [
     {
       "displayPrice" : "9.99",
       "familyShareable" : true,
-      "internalID" : "SPROUTLYPRO01",
+      "internalID" : "BC84D252-C210-4EF3-8956-C043FFD1E28C",
       "localizations" : [
         {
           "description" : "Every child, every memory, ready to share. One payment, yours forever.",
@@ -19,7 +19,7 @@
     }
   ],
   "settings" : {
-    "_applicationInternalID" : "SPROUTLY",
+    "_applicationInternalID" : "6448936300",
     "_developerTeamID" : "FDYHXN3XSH",
     "_lastSynchronizedDate" : 0
   },

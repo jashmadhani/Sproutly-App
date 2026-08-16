@@ -82,12 +82,29 @@ private extension OnboardingView {
 
 private extension OnboardingView {
 
+    // Vertically centers short intro content, but — unlike a bare Spacer()
+    // pair inside a ScrollView, which has nothing to expand into and just
+    // left content pinned near the top — still scrolls normally if the
+    // content or a larger Dynamic Type size ever exceeds the screen height.
+    func centeredIntroStep<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 24) {
+                    Spacer(minLength: 0)
+                    content()
+                    Spacer(minLength: 0)
+                }
+                .padding()
+                .frame(minHeight: geo.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
     // Step 1: Welcome — "Every small moment matters"
     var welcomeStep: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 40)
-
+        centeredIntroStep {
+            Group {
                 ZStack {
                     Circle()
                         .fill(theme.blue.opacity(0.12))
@@ -103,12 +120,12 @@ private extension OnboardingView {
                 }
 
                 Text("Sproutly")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.sproutlyDisplay(40))
                     .foregroundStyle(theme.text)
 
                 VStack(spacing: 8) {
                     Text("Every small moment matters")
-                        .font(.title3.weight(.medium))
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
 
                     Text("Sproutly helps you notice the quiet,\nbeautiful growth happening every day.")
@@ -117,12 +134,8 @@ private extension OnboardingView {
                         .foregroundStyle(theme.textSecondary)
                         .lineSpacing(4)
                 }
-
-                Spacer(minLength: 40)
             }
-            .padding()
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
 
     // Step 2: How It Works — Observe → Log → Reflect
@@ -131,8 +144,7 @@ private extension OnboardingView {
             Spacer(minLength: 8)
 
             Text("How Sproutly Works")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
+                .font(.sproutlyDisplay(28))
                 .foregroundStyle(theme.text)
 
             VStack(spacing: 12) {
@@ -157,7 +169,7 @@ private extension OnboardingView {
             .padding(.horizontal, 24)
 
             Text("That's it. Simple, gentle, yours.")
-                .font(.caption)
+                .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
@@ -169,10 +181,8 @@ private extension OnboardingView {
 
     // Step 3: Reassurance — "There is no perfect timeline"
     var reassuranceStep: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 40)
-
+        centeredIntroStep {
+            Group {
                 ZStack {
                     Circle()
                         .fill(theme.green.opacity(0.12))
@@ -184,8 +194,7 @@ private extension OnboardingView {
                 }
 
                 Text("There is no\nperfect timeline")
-                    .font(.system(.title, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.sproutlyDisplay(30))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.text)
 
@@ -194,20 +203,14 @@ private extension OnboardingView {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.textSecondary)
                     .lineSpacing(4)
-
-                Spacer(minLength: 40)
             }
-            .padding()
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
 
     // Step 4: Medical Disclaimer
     var disclaimerStep: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 40)
-
+        centeredIntroStep {
+            Group {
                 ZStack {
                     Circle()
                         .fill(theme.blue.opacity(0.12))
@@ -219,36 +222,28 @@ private extension OnboardingView {
                 }
 
                 Text("Important Notice")
-                    .font(.system(.title, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.sproutlyDisplay(30))
                     .foregroundStyle(theme.text)
 
+                // Kept to two sentences deliberately — both required disclaimers
+                // (educational-only, not a substitute for professional care)
+                // survive, just tightened. Never drop either claim.
                 VStack(spacing: 16) {
-                    Text("Sproutly is an educational tool for tracking your child's developmental milestones.")
+                    Text("Sproutly is an educational tool — not a substitute for professional medical advice, diagnosis, or treatment.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.text)
                         .lineSpacing(4)
 
-                    Text("It is not a substitute for professional medical advice, diagnosis, or treatment.")
-                        .font(.body)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(theme.text)
-                        .lineSpacing(4)
-
-                    Text("Always seek the advice of your pediatrician with any questions about your child's development.")
+                    Text("Always seek your pediatrician's advice for questions about your child's development.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
                         .lineSpacing(4)
                 }
                 .padding(.horizontal, 20)
-
-                Spacer(minLength: 40)
             }
-            .padding()
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
 
     // Step 5: Quick Profile Setup
@@ -260,7 +255,7 @@ private extension OnboardingView {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(theme.yellow.opacity(0.25))
+                            .fill(theme.blue.opacity(0.12))
                             .frame(width: 60, height: 60)
 
                         Image(systemName: "person.crop.circle.fill")
@@ -269,16 +264,13 @@ private extension OnboardingView {
                     }
 
                     Text("About Your Little One")
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
+                        .font(.sproutlyDisplay(26))
                         .foregroundStyle(theme.text)
                 }
 
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Child's Name", systemImage: "heart.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.blue)
+                        fieldLabel("Child's Name", systemImage: "heart.fill")
 
 
                         TextField("Enter name", text: $childName)
@@ -299,9 +291,7 @@ private extension OnboardingView {
 
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Birth Date", systemImage: "calendar")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.blue)
+                        fieldLabel("Birth Date", systemImage: "calendar")
 
                         DatePicker("", selection: $birthDate, displayedComponents: .date)
                             .datePickerStyle(.compact)
@@ -313,10 +303,10 @@ private extension OnboardingView {
                     Toggle(isOn: $isPremature) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Born Before 37 Weeks")
-                                .font(.subheadline.weight(.medium))
+                                .font(Theme.sproutlyCardTitle)
                                 .foregroundStyle(theme.text)
                             Text("We'll adjust milestones gently")
-                                .font(.caption)
+                                .font(Theme.sproutlyBody)
                                 .foregroundStyle(theme.textSecondary)
                         }
                     }
@@ -324,12 +314,10 @@ private extension OnboardingView {
 
                     if isPremature {
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("Gestational Age at Birth", systemImage: "calendar.badge.clock")
-                                .font(.subheadline)
-                                .foregroundStyle(theme.blue)
+                            fieldLabel("Gestational Age at Birth", systemImage: "calendar.badge.clock")
 
                             Picker("Weeks", selection: $gestationalWeeks) {
-                                ForEach(24...36, id: \.self) { week in
+                                ForEach(24...40, id: \.self) { week in
                                     Text("\(week) weeks").tag(week)
                                 }
                             }
@@ -353,6 +341,20 @@ private extension OnboardingView {
 #endif
     }
 
+    // Helper: form field label — icon carries the accent color, text stays
+    // neutral. An all-blue label (icon + text) reads as unusually loud for a
+    // form; every standard iOS form (Settings, Contacts) keeps labels neutral
+    // and reserves color for the interactive/accent element only.
+    func fieldLabel(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(theme.blue)
+            Text(text)
+                .foregroundStyle(theme.textSecondary)
+        }
+        .font(Theme.sproutlyCardTitle)
+    }
+
     // Helper: Compact How-It-Works row
     func howItWorksRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(spacing: 16) {
@@ -368,11 +370,11 @@ private extension OnboardingView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.text)
 
                 Text(subtitle)
-                    .font(.footnote)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -442,8 +444,9 @@ private extension OnboardingView {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Text(step == totalSteps - 1 ? "Begin Your Journey" : "Continue")
+                    Text(step == totalSteps - 1 ? "Get Started" : "Continue")
                         .fontWeight(.semibold)
+                        .fixedSize()
 
                     Image(systemName: step == totalSteps - 1 ? "heart.fill" : "chevron.right")
                 }

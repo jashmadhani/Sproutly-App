@@ -88,6 +88,10 @@ struct MyApp: App {
     @State private var themeManager = ThemeManager()
     @State private var purchases = PurchaseManager()
 
+    init() {
+        _ = SproutlyFont.didRegister
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

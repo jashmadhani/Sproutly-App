@@ -61,8 +61,7 @@ struct AssistantView: View {
             VStack {
                 HStack {
                     Text("Assistant")
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.bold)
+                        .font(.sproutlyCompactHeading(17))
                         .foregroundStyle(theme.text)
                     Spacer()
                 }
@@ -81,12 +80,11 @@ struct AssistantView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Assistant")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
+                .font(.sproutlyDisplay(30))
                 .foregroundStyle(theme.text)
 
             Text("Ask anything about your child's growth")
-                .font(.subheadline)
+                .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

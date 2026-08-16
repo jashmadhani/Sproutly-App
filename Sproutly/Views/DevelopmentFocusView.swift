@@ -112,11 +112,11 @@ struct DevelopmentFocusView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(concernLevel.title)
-                    .font(.callout.weight(.semibold))
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
 
                 Text("\(totalFlagged) earlier skill\(totalFlagged == 1 ? "" : "s") to revisit")
-                    .font(.caption)
+                    .font(Theme.sproutlyMeta)
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
             }
         }
@@ -126,7 +126,7 @@ struct DevelopmentFocusView: View {
 
     private var bodyText: some View {
         Text(primaryCopy)
-            .font(.subheadline)
+            .font(Theme.sproutlyBody)
             .foregroundStyle(Theme.textSecondary(for: nightMode))
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -153,13 +153,13 @@ struct DevelopmentFocusView: View {
                         .frame(width: 20)
 
                     Text(concern.category.gentleLabel)
-                        .font(.subheadline)
+                        .font(Theme.sproutlyItemTitle)
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
 
                     Spacer()
 
                     Text(concern.summary)
-                        .font(.caption)
+                        .font(Theme.sproutlyMeta)
                         .foregroundStyle(Theme.textSecondary(for: nightMode))
                 }
                 .padding(.vertical, 6)
@@ -184,7 +184,7 @@ struct DevelopmentFocusView: View {
                 .padding(.top, 2)
 
             Text("Early support can make a meaningful difference. Pediatricians routinely screen for developmental milestones and welcome questions at any visit.")
-                .font(.caption)
+                .font(Theme.sproutlyBody)
                 .foregroundStyle(Theme.textSecondary(for: nightMode))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -210,13 +210,13 @@ struct DevelopmentFocusView: View {
                     .frame(width: 20)
 
                 Text("What is Early Intervention?")
-                    .font(.subheadline.weight(.medium))
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
                     .rotationEffect(.degrees(showEarlyIntervention ? 90 : 0))
                     .frame(width: 44, height: 44)
@@ -261,7 +261,7 @@ struct DevelopmentFocusView: View {
                 .frame(width: 16)
 
             Text(text)
-                .font(.caption)
+                .font(Theme.sproutlyBody)
                 .foregroundStyle(Theme.textSecondary(for: nightMode))
                 .fixedSize(horizontal: false, vertical: true)
         }

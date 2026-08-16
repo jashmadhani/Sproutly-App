@@ -23,7 +23,7 @@ struct MilestonePhotoPicker: View {
 
         VStack(alignment: .leading, spacing: 8) {
             Label("Add a photo", systemImage: "photo")
-                .font(.caption.weight(.medium))
+                .font(Theme.sproutlyCardTitle)
                 .foregroundStyle(Theme.accentBlue(for: isNight))
 
             PhotosPicker(selection: $selection, matching: .images, photoLibrary: .shared()) {
@@ -37,7 +37,7 @@ struct MilestonePhotoPicker: View {
                     selection = nil
                 } label: {
                     Label("Remove photo", systemImage: "xmark.circle")
-                        .font(.caption)
+                        .font(Theme.sproutlyMeta)
                         .foregroundStyle(Theme.textSecondary(for: isNight))
                 }
                 .buttonStyle(.plain)
@@ -65,8 +65,8 @@ private struct PickerLabel: View {
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "photo.badge.plus")
-                Text("Choose a photo (optional)")
-                    .font(.subheadline)
+                Text("Choose a photo")
+                    .font(Theme.sproutlyBody)
             }
             .foregroundStyle(Theme.textSecondary(for: nightMode))
             .frame(maxWidth: .infinity)

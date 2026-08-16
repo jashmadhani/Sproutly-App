@@ -29,8 +29,7 @@ struct AboutDataView: View {
                     }
                     
                     Text("About the Data")
-                        .font(.system(.title, design: .rounded))
-                        .fontWeight(.bold)
+                        .font(.sproutlyDisplay(28))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.text)
                     

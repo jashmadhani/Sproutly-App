@@ -51,7 +51,7 @@ Building/testing is done in Xcode (⌘R / ⌘U); a single test runs from the dia
 
 **Sharing.** `ReportBuilder.build(for:)` produces a `MilestoneReport` value; `ShareRenderer` turns it into a PDF (pediatrician report) or a milestone share card PNG, both written to temp URLs handed to `ShareSheet`. Rendering is separate from building so the report is testable without a graphics context.
 
-**Assistant is rule-based, not an LLM.** `Views/SupportAssistantView.swift` holds a keyword→category→weight table plus one hand-written response per `MilestoneCategory`. Never introduce a network call here.
+**Assistant is rule-based, not an LLM.** `Views/AssistantView.swift` is the tab screen (header + scroll chrome); `Views/SupportAssistantView.swift` holds the actual logic — a keyword→category→weight table plus one hand-written response per `MilestoneCategory`. Never introduce a network call here.
 
 **Theming.** `Theme.swift` exposes only `static func x(for nightMode: Bool) -> Color` — no adaptive asset colors. `ThemeManager` (`@Observable`, `UserDefaults` key `nightModeEnabled`) resolves them and drives `.preferredColorScheme`. Views use `@Environment(ThemeManager.self)` with `theme.card`, `.warmCard(nightMode:)`, `AmbientBackground`. Don't hardcode a `Color` in a view.
 

@@ -30,7 +30,7 @@ struct AddChildSheet: View {
                     VStack(alignment: .leading, spacing: 20) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Name")
-                                .font(.caption)
+                                .font(Theme.sproutlyMeta)
                                 .foregroundStyle(theme.textSecondary)
 
                             TextField("Child's name", text: $name)
@@ -45,7 +45,7 @@ struct AddChildSheet: View {
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Birth Date")
-                                .font(.caption)
+                                .font(Theme.sproutlyMeta)
                                 .foregroundStyle(theme.textSecondary)
 
                             DatePicker(
@@ -62,10 +62,10 @@ struct AddChildSheet: View {
                         Toggle(isOn: $isPremature) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Born Before 37 Weeks")
-                                    .font(.subheadline)
+                                    .font(Theme.sproutlyCardTitle)
                                     .foregroundStyle(theme.text)
                                 Text("Milestones will be gently adjusted")
-                                    .font(.caption)
+                                    .font(Theme.sproutlyBody)
                                     .foregroundStyle(theme.textSecondary)
                             }
                         }
@@ -74,11 +74,11 @@ struct AddChildSheet: View {
                         if isPremature {
                             HStack {
                                 Text("Gestational age:")
-                                    .font(.subheadline)
+                                    .font(Theme.sproutlyBody)
                                     .foregroundStyle(theme.textSecondary)
 
                                 Picker("", selection: $gestationalWeeks) {
-                                    ForEach(24...36, id: \.self) { week in
+                                    ForEach(24...40, id: \.self) { week in
                                         Text("\(week) weeks").tag(week)
                                     }
                                 }

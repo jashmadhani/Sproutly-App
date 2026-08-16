@@ -69,16 +69,16 @@ struct MainTabView: View {
 #endif
                     selectedTab = tab
                 } label: {
-                    VStack(spacing: 5) {
+                    VStack(spacing: 4) {
                         Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
-                            .font(.system(size: 20))
-                            .frame(width: 28, height: 24)
+                            .font(.system(size: 25, weight: .medium))
+                            .frame(width: 32, height: 28)
 
                         Text(tab.rawValue)
-                            .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .rounded))
+                            .font(.system(size: 10, weight: isSelected ? .semibold : .regular, design: .rounded))
                     }
                     .foregroundStyle(
-                        isSelected ? theme.blue : theme.textSecondary.opacity(0.7)
+                        isSelected ? theme.blue : theme.textSecondary.opacity(0.8)
                     )
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)

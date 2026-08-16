@@ -19,11 +19,29 @@ struct SettingsView: View {
     
     @State private var showResetAlert = false
     @State private var showDeleteAlert = false
-    @State private var showAboutData = false
-    @State private var showAddChild = false
+    // One sheet binding rather than several. Stacking multiple `.sheet`
+    // modifiers on the same view is unreliable in SwiftUI — presentations
+    // compete and some silently never appear — so every modal this screen owns
+    // goes through a single enum-driven presentation.
+    private enum SettingsSheet: Identifiable {
+        case addChild
+        case aboutData
+        case appIcon
+        case paywall(PaywallReason)
+
+        var id: String {
+            switch self {
+            case .addChild:          return "addChild"
+            case .aboutData:         return "aboutData"
+            case .appIcon:           return "appIcon"
+            case .paywall(let r):    return "paywall-\(r.id)"
+            }
+        }
+    }
+
+    @State private var activeSheet: SettingsSheet?
     @State private var showRemoveChildAlert = false
     @State private var childToDelete: Child?
-    @State private var paywallReason: PaywallReason? = nil
     @State private var scrollOffset: CGFloat = 0
     
     private var isCompactHeader: Bool { scrollOffset < -10 }
@@ -39,6 +57,7 @@ struct SettingsView: View {
                     childrenSection
                     profileSection
                     prematuritySection
+                    appIconSection
                     aboutSection
                     dataSection
                 }
@@ -70,8 +89,7 @@ struct SettingsView: View {
             VStack {
                 HStack {
                     Text("Settings")
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.bold)
+                        .font(.sproutlyCompactHeading(17))
                         .foregroundStyle(theme.text)
                     Spacer()
                 }
@@ -106,28 +124,41 @@ struct SettingsView: View {
         } message: {
             Text("This permanently removes \(childToDelete?.displayName ?? "this child") and their milestones. Other children are not affected.")
         }
-        .sheet(isPresented: $showAddChild) {
-            AddChildSheet()
-        }
-        .sheet(item: $paywallReason) { reason in
-            PaywallView(reason: reason)
-        }
-        .sheet(isPresented: $showAboutData) {
-            AboutDataView()
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addChild:       AddChildSheet()
+            case .aboutData:      AboutDataView()
+            case .appIcon:        AppIconPickerView()
+            case .paywall(let r): PaywallView(reason: r)
+            }
         }
     }
     
+    // MARK: - Field Label
+
+    // Icon carries the accent color, text stays neutral — an all-blue label
+    // (icon + text) reads as unusually loud for a section header; matches the
+    // same helper in OnboardingView so the two form-heavy screens agree.
+    private func fieldLabel(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(theme.blue)
+            Text(text)
+                .foregroundStyle(theme.textSecondary)
+        }
+        .font(Theme.sproutlyCardTitle)
+    }
+
     // MARK: - Header
-    
+
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Settings")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
+                .font(.sproutlyDisplay(30))
                 .foregroundStyle(theme.text)
             
             Text("Adjust your experience")
-                .font(.subheadline)
+                .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
         }
         .padding(.vertical, 8)
@@ -151,11 +182,11 @@ struct SettingsView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Night Mode")
-                    .font(.subheadline.weight(.medium))
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.text)
-                
+
                 Text("Reduce brightness for quiet evenings")
-                    .font(.caption)
+                    .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
             }
             
@@ -177,9 +208,7 @@ struct SettingsView: View {
     // a parent with one child sees just "Add a child".
     private var childrenSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Children", systemImage: "figure.2.and.child.holdinghands")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(theme.blue)
+            fieldLabel("Children", systemImage: "figure.2.and.child.holdinghands")
 
             if childStore.hasMultipleChildren {
                 ForEach(childStore.children) { entry in
@@ -194,10 +223,10 @@ struct SettingsView: View {
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(entry.displayName)
-                                        .font(.subheadline.weight(isActive ? .semibold : .regular))
+                                        .font(isActive ? Theme.sproutlyCardTitle : Font.system(.body).weight(.regular))
                                         .foregroundStyle(theme.text)
                                     Text(entry.ageText)
-                                        .font(.caption)
+                                        .font(Theme.sproutlyMeta)
                                         .foregroundStyle(theme.textSecondary)
                                 }
 
@@ -230,16 +259,16 @@ struct SettingsView: View {
             Button {
                 // The first child is free; a second is where Pro begins.
                 if purchases.isPro || childStore.children.isEmpty {
-                    showAddChild = true
+                    activeSheet = .addChild
                 } else {
-                    paywallReason = .secondChild
+                    activeSheet = .paywall(.secondChild)
                 }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "plus.circle.fill")
                         .foregroundStyle(theme.blue)
                     Text("Add a child")
-                        .font(.subheadline)
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Spacer()
                 }
@@ -256,14 +285,12 @@ struct SettingsView: View {
         @Bindable var profile = child
         
         return VStack(alignment: .leading, spacing: 16) {
-            Label(child.displayName, systemImage: "heart.fill")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(theme.blue)
+            fieldLabel(child.displayName, systemImage: "heart.fill")
             
             // Name
             VStack(alignment: .leading, spacing: 6) {
                 Text("Name")
-                    .font(.caption)
+                    .font(Theme.sproutlyMeta)
                     .foregroundStyle(theme.textSecondary)
                 
                 TextField("Child's name", text: $profile.name)
@@ -282,7 +309,7 @@ struct SettingsView: View {
             // Birth date
             VStack(alignment: .leading, spacing: 6) {
                 Text("Birth Date")
-                    .font(.caption)
+                    .font(Theme.sproutlyMeta)
                     .foregroundStyle(theme.textSecondary)
                 
                 DatePicker("", selection: $profile.birthDate, displayedComponents: .date)
@@ -303,17 +330,15 @@ struct SettingsView: View {
         @Bindable var profile = child
         
         return VStack(alignment: .leading, spacing: 16) {
-            Label("Adjusted Age", systemImage: "sparkles")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(theme.blue)
+            fieldLabel("Adjusted Age", systemImage: "sparkles")
             
             Toggle(isOn: $profile.isPremature) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Born Before 37 Weeks")
-                        .font(.subheadline)
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Text("Milestones will be gently adjusted")
-                        .font(.caption)
+                        .font(Theme.sproutlyBody)
                         .foregroundStyle(theme.textSecondary)
                 }
             }
@@ -327,11 +352,11 @@ struct SettingsView: View {
             if child.isPremature {
                 HStack {
                     Text("Gestational age:")
-                        .font(.subheadline)
+                        .font(Theme.sproutlyBody)
                         .foregroundStyle(theme.textSecondary)
                     
                     Picker("", selection: $profile.gestationalWeeks) {
-                        ForEach(24...36, id: \.self) { week in
+                        ForEach(24...40, id: \.self) { week in
                             Text("\(week) weeks").tag(week)
                         }
                     }
@@ -347,22 +372,56 @@ struct SettingsView: View {
         .animation(.spring(response: 0.4), value: child.isPremature)
     }
     
+    // MARK: - App Icon
+
+    // Reach-triggered like every other gate: a free parent taps this and gets
+    // the paywall naming the feature, rather than a disabled row.
+    private var appIconSection: some View {
+        Button {
+            activeSheet = purchases.isPro ? .appIcon : .paywall(.appIcon)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "app.badge")
+                    .foregroundStyle(theme.textSecondary)
+                Text("App Icon")
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(theme.text)
+                Spacer()
+                if !purchases.isPro {
+                    Text("Pro")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(theme.proGold)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(theme.proGold.opacity(0.14))
+                        )
+                }
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .warmCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - About
-    
+
     private var aboutSection: some View {
         Button {
-            showAboutData = true
+            activeSheet = .aboutData
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(theme.textSecondary)
                 Text("About the Data")
-                    .font(.subheadline)
+                    .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.text)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(theme.textSecondary.opacity(0.5))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textSecondary.opacity(0.6))
             }
         }
         .buttonStyle(.plain)
@@ -380,7 +439,7 @@ struct SettingsView: View {
                     Image(systemName: "arrow.counterclockwise")
                         .foregroundStyle(theme.textSecondary)
                     Text("Reset Milestone Progress")
-                        .font(.subheadline)
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Spacer()
                 }
@@ -396,7 +455,7 @@ struct SettingsView: View {
                     Image(systemName: "trash")
                         .foregroundStyle(.red.opacity(0.7))
                     Text("Delete All Data")
-                        .font(.subheadline)
+                        .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(.red.opacity(0.7))
                     Spacer()
                 }

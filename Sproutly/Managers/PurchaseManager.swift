@@ -55,8 +55,16 @@ final class PurchaseManager {
     func loadProduct() async {
         do {
             product = try await Product.products(for: [Self.productID]).first
+            if product == nil {
+                // Not thrown — StoreKit returns an empty list rather than an
+                // error when the product ID isn't recognized. Silently leaving
+                // this unset is what made the paywall spin forever with no
+                // explanation; surface it so the button can show a real state.
+                state = .failed("Sproutly Pro isn't available right now. Please try again later.")
+            }
         } catch {
             print("⚠️ Sproutly: could not load product — \(error.localizedDescription)")
+            state = .failed("Couldn't reach the App Store. Check your connection and try again.")
         }
     }
 

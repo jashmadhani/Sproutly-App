@@ -24,7 +24,6 @@ final class DashboardViewModel {
     private(set) var hasDevelopmentFocus: Bool = false
     private(set) var concernLevel: ConcernLevel = .reviewSuggested
     private(set) var domainConcerns: [DomainConcern] = []
-    private(set) var greetingText: String = "Good Morning"
 
     // skip only when all inputs that affect derived state are unchanged
     private var lastMilestoneSignature: Int?
@@ -52,7 +51,6 @@ final class DashboardViewModel {
         lastCorrectedAge = age
 
         correctedAge = age
-        greetingText = Self.resolveGreeting()
 
         let brackets = Array(Set(milestones.map(\.ageMonth))).sorted()
         targetAgeMonth = Self.resolveTargetAge(
@@ -102,16 +100,6 @@ final class DashboardViewModel {
     }
 
     // MARK: - Private Helpers
-
-    private static func resolveGreeting() -> String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12:  return "Good Morning"
-        case 12..<17: return "Good Afternoon"
-        case 17..<21: return "Good Evening"
-        default:      return "Good Night"
-        }
-    }
 
     // stay on most recent incomplete bracket the child has reached
     private static func resolveTargetAge(
