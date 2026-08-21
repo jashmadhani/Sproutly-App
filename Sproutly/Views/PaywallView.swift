@@ -288,10 +288,15 @@ enum PaywallReason: Identifiable {
 // MARK: - Links
 
 enum AppLinks {
-    // Served as a static page from the portfolio site. App Review follows this
-    // link from the paywall, so it must stay reachable for as long as the app
-    // is on sale — it is not a marketing page that can be retired.
-    static let privacyPolicy = URL(string: "https://jash.madhani.in/sproutly/privacy/")!
+    // Served as static pages from the Sproutly product site, deliberately
+    // separate from the personal portfolio — a parent following this link should
+    // land on the app's own site, not on a CV. App Review follows the privacy
+    // link from the paywall and the support link from App Store Connect, so both
+    // must stay reachable for as long as the app is on sale; they are not
+    // marketing pages that can be retired. Changing either means a new build,
+    // since they are compiled in.
+    static let privacyPolicy = URL(string: "https://sproutly.madhani.in/privacy/")!
+    static let support = URL(string: "https://sproutly.madhani.in/support/")!
     // Apple's standard EULA, which is the default terms for any app that does
     // not supply its own.
     static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
