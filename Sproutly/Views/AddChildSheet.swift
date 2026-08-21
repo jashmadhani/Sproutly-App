@@ -114,6 +114,7 @@ struct AddChildSheet: View {
     }
 }
 
+#if DEBUG
 #Preview {
     AddChildSheet()
         .environment(previewChildStore)
@@ -121,3 +122,4 @@ struct AddChildSheet: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

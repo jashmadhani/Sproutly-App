@@ -1,3 +1,13 @@
+//
+//  PreviewMocks.swift
+//  Sproutly
+//
+//  Mock data for SwiftUI previews only. Gated so the seeded "Aanya" child and
+//  its in-memory container are never compiled into a shipping binary — nothing
+//  at runtime references them, but a release build has no reason to carry them.
+//
+
+#if DEBUG
 import SwiftData
 import SwiftUI
 
@@ -22,3 +32,5 @@ public let previewContainer: ModelContainer = {
 // Store backed by the preview container, for views that need the environment.
 @MainActor
 let previewChildStore = ChildStore(context: previewContainer.mainContext)
+
+#endif

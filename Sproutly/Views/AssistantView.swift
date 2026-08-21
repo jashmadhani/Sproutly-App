@@ -104,6 +104,7 @@ struct AssistantView: View {
 
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
 
     AssistantView()
@@ -112,3 +113,4 @@ struct AssistantView: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

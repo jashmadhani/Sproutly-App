@@ -68,7 +68,9 @@ struct ProWelcomeView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ProWelcomeView()
         .environment(ThemeManager())
 }
+#endif

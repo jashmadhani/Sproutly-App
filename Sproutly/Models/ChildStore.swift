@@ -99,6 +99,14 @@ final class ChildStore {
     }
 
     func delete(_ child: Child) {
+        // The cascade rule removes the milestone rows, but photos live as files on
+        // disk and SwiftData knows nothing about them — without this they survive
+        // every deletion with no row referencing them, including "Delete All Data",
+        // which a parent reasonably reads as "the photos are gone too".
+        for milestone in child.milestones {
+            PhotoStore.delete(milestone.photoFilename)
+        }
+
         // Cascade delete rule removes the child's milestones with them.
         context.delete(child)
         save()
@@ -115,7 +123,7 @@ final class ChildStore {
         do {
             try context.save()
         } catch {
-            print("⚠️ Sproutly: failed to save — \(error.localizedDescription)")
+            sproutlyLog("failed to save — \(error.localizedDescription)")
         }
     }
 

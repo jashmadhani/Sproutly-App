@@ -490,6 +490,7 @@ private extension OnboardingView {
     }
 }
 
+#if DEBUG
 #Preview {
     OnboardingView()
         .environment(previewChildStore)
@@ -497,3 +498,4 @@ private extension OnboardingView {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

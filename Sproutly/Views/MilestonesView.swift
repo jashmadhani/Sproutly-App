@@ -734,6 +734,7 @@ private struct MilestoneThumbnail: View {
 
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
 
     MilestonesView()
@@ -742,3 +743,4 @@ private struct MilestoneThumbnail: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

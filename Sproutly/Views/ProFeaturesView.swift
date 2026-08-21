@@ -61,7 +61,9 @@ struct ProFeaturesView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ProFeaturesView()
         .environment(ThemeManager())
 }
+#endif

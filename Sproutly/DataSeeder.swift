@@ -32,21 +32,34 @@ struct DataSeeder {
         do {
             try modelContext.save()
         } catch {
-            print("⚠️ Sproutly: Failed to save seeded milestones — \(error.localizedDescription)")
+            sproutlyLog("Failed to save seeded milestones — \(error.localizedDescription)")
         }
     }
 
-    // Repairs a child whose standard milestones are missing or incomplete, leaving
-    // parent-authored ones untouched.
+    // Repairs a child whose standard milestones are missing some entries, leaving
+    // existing progress and parent-authored ones untouched. This runs on every
+    // Dashboard appearance, so it must only ever ADD what's missing — the previous
+    // version deleted and recreated every standard milestone whenever the total
+    // count didn't match allMilestones.count, which silently wiped every parent's
+    // completion, notes, and photos each time a milestone was added or removed
+    // from the catalog between builds (photo files were orphaned on disk since
+    // only the database rows were deleted, never the file).
     @MainActor
     static func reseedIfIncomplete(for child: Child, in modelContext: ModelContext) {
-        let standard = child.milestones.filter { !$0.isUserCreated }
-        guard standard.count < allMilestones.count else { return }
+        let existingTitles = Set(child.milestones.filter { !$0.isUserCreated }.map(\.title))
+        let missing = allMilestones.filter { !existingTitles.contains($0.title) }
+        guard !missing.isEmpty else { return }
 
-        for milestone in standard {
-            modelContext.delete(milestone)
+        for milestone in missing {
+            milestone.child = child
+            modelContext.insert(milestone)
         }
-        seed(for: child, in: modelContext)
+
+        do {
+            try modelContext.save()
+        } catch {
+            sproutlyLog("Failed to repair seeded milestones — \(error.localizedDescription)")
+        }
     }
 
     // MARK: - 6 Months

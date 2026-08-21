@@ -57,6 +57,7 @@ struct OneTapLogButton: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ZStack {
         Color(hex: 0xFAF8F4).ignoresSafeArea()
@@ -67,3 +68,4 @@ struct OneTapLogButton: View {
         }
     }
 }
+#endif

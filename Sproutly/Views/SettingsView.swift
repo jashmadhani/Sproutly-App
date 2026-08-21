@@ -509,6 +509,11 @@ struct SettingsView: View {
             milestone.isCompleted = false
             milestone.dateCompleted = nil
             milestone.completionNote = ""
+            // The single-milestone "Remove" path already does this. Without it here,
+            // resetting progress leaves the image on disk with nothing referencing
+            // it, and the row still claiming a photo it no longer shows.
+            PhotoStore.delete(milestone.photoFilename)
+            milestone.photoFilename = nil
         }
         childStore.save()
     }
@@ -527,6 +532,7 @@ struct SettingsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SettingsView()
         .environment(previewChildStore)
@@ -534,3 +540,4 @@ struct SettingsView: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

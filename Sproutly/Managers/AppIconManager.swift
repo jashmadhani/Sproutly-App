@@ -17,7 +17,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     case sprout
     case twin
     case night
-    case sage
+    case blossom
 
     var id: String { rawValue }
 
@@ -28,7 +28,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .sprout:  return "AppIconSprout"
         case .twin:    return "AppIconTwin"
         case .night:   return "AppIconNight"
-        case .sage:    return "AppIconSage"
+        case .blossom: return "AppIconBlossom"
         }
     }
 
@@ -38,7 +38,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .sprout:  return "Golden"
         case .twin:    return "Two Sprouts"
         case .night:   return "Night"
-        case .sage:    return "Sage"
+        case .blossom: return "Blossom"
         }
     }
 
@@ -48,7 +48,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .sprout:  return "Warm gold"
         case .twin:    return "For siblings and twins"
         case .night:   return "Deep navy"
-        case .sage:    return "Soft and quiet"
+        case .blossom: return "In full bloom"
         }
     }
 
@@ -61,7 +61,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .sprout:  return "AppIconSproutPreview"
         case .twin:    return "AppIconTwinPreview"
         case .night:   return "AppIconNightPreview"
-        case .sage:    return "AppIconSagePreview"
+        case .blossom: return "AppIconBlossomPreview"
         }
     }
 }

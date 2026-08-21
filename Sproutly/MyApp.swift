@@ -30,31 +30,47 @@ let sharedAppContainer: ModelContainer = {
     let config = ModelConfiguration("SproutlyDB", schema: schema, isStoredInMemoryOnly: false)
 
     // 1. Normal path.
-    if let container = try? ModelContainer(
-        for: schema,
-        migrationPlan: SproutlyMigrationPlan.self,
-        configurations: [config]
-    ) {
-        return container
+    do {
+        return try ModelContainer(
+            for: schema,
+            migrationPlan: SproutlyMigrationPlan.self,
+            configurations: [config]
+        )
+    } catch {
+        // Deliberately not `try?`. Archiving is destructive from the parent's point
+        // of view — every milestone, note, and photo disappears and they land back
+        // in onboarding — so the reason is recorded rather than swallowed. The
+        // overwhelmingly likely cause is a model change shipped without a matching
+        // migration stage (SproutlyMigrationPlan.stages is still empty), which is a
+        // build-time mistake, not a parent's corrupted disk.
+        StoreRecovery.lastOpenFailure = String(describing: error)
+        sproutlyLog("store could not be opened — \(error)")
     }
 
     // 2. The store exists but cannot be opened — an incompatible pre-release store,
     //    or corruption. Move it aside rather than deleting it, so the data is still
     //    recoverable, and start clean instead of crash-looping on every launch.
-    print("⚠️ Sproutly: store unreadable, archiving it and starting fresh")
+    sproutlyLog("archiving the unreadable store and starting fresh")
     archiveExistingStore()
 
-    if let container = try? ModelContainer(
-        for: schema,
-        migrationPlan: SproutlyMigrationPlan.self,
-        configurations: [config]
-    ) {
+    do {
+        let container = try ModelContainer(
+            for: schema,
+            migrationPlan: SproutlyMigrationPlan.self,
+            configurations: [config]
+        )
+        // Only now is the loss real: a fresh store opened over an archived one.
+        // ContentView surfaces this once so the parent isn't left silently
+        // wondering where everything went.
+        StoreRecovery.didArchiveStore = true
         return container
+    } catch {
+        sproutlyLog("fresh store also failed to open — \(error)")
     }
 
     // 3. Disk is unusable entirely. Run in memory for this session rather than
     //    black-screening a parent who just opened the app.
-    print("⚠️ Sproutly: on-disk store unavailable, using in-memory for this session")
+    sproutlyLog("on-disk store unavailable, using in-memory for this session")
     let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     guard let container = try? ModelContainer(for: schema, configurations: [fallback]) else {
         fatalError("Failed to build even an in-memory container")
@@ -62,7 +78,18 @@ let sharedAppContainer: ModelContainer = {
     return container
 }()
 
-// Renames SproutlyDB.store (and its -shm/-wal siblings) with a timestamp suffix.
+// Records that the on-disk store had to be replaced, so the UI can say so once
+// instead of the parent silently losing everything and landing in onboarding.
+enum StoreRecovery {
+    nonisolated(unsafe) static var didArchiveStore = false
+    nonisolated(unsafe) static var lastOpenFailure: String?
+
+    static let didShowNoticeKey = "sproutly_did_show_store_recovery_notice"
+}
+
+// Renames SproutlyDB.store (and its -shm/-wal siblings) with a timestamp suffix,
+// and moves the photo folder aside with them so a recovered store still lines up
+// with the images its rows reference.
 private func archiveExistingStore() {
     let fileManager = FileManager.default
     guard let appSupport = fileManager
@@ -76,6 +103,52 @@ private func archiveExistingStore() {
         let destination = appSupport
             .appendingPathComponent("SproutlyDB-backup-\(stamp).\(suffix)")
         try? fileManager.moveItem(at: source, to: destination)
+    }
+
+    // Photos are referenced only by filename from the archived rows. Left in place
+    // they would be orphaned forever — no row points at them and nothing ever
+    // cleans them up. Moved alongside, the pair stays internally consistent.
+    let photos = appSupport.appendingPathComponent("MilestonePhotos", isDirectory: true)
+    if fileManager.fileExists(atPath: photos.path) {
+        let destination = appSupport
+            .appendingPathComponent("MilestonePhotos-backup-\(stamp)", isDirectory: true)
+        try? fileManager.moveItem(at: photos, to: destination)
+    }
+
+    pruneOldArchives(in: appSupport)
+}
+
+// Archives are a safety net, not a history. Without a cap, a device that fails to
+// open the store on every launch accumulates a full copy of the database and photo
+// library each time until it runs out of space.
+private func pruneOldArchives(in directory: URL) {
+    let fileManager = FileManager.default
+    guard let entries = try? fileManager.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: [.creationDateKey]
+    ) else { return }
+
+    // Group by the timestamp embedded in the name so a store and its photo folder
+    // are pruned together.
+    let stamps = Set(entries.compactMap { url -> Int? in
+        let name = url.lastPathComponent
+        guard name.hasPrefix("SproutlyDB-backup-") || name.hasPrefix("MilestonePhotos-backup-") else {
+            return nil
+        }
+        let digits = name
+            .replacingOccurrences(of: "SproutlyDB-backup-", with: "")
+            .replacingOccurrences(of: "MilestonePhotos-backup-", with: "")
+            .prefix { $0.isNumber }
+        return Int(digits)
+    })
+
+    // Keep the two most recent generations; older ones are past any realistic
+    // chance of being recovered by hand.
+    let doomed = stamps.sorted(by: >).dropFirst(2)
+    for stamp in doomed {
+        for entry in entries where entry.lastPathComponent.contains("-backup-\(stamp)") {
+            try? fileManager.removeItem(at: entry)
+        }
     }
 }
 
@@ -112,6 +185,7 @@ struct ContentView: View {
     @Environment(PurchaseManager.self) private var purchases
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasImported = false
+    @State private var showStoreRecoveryNotice = false
 
     var body: some View {
         Group {
@@ -122,9 +196,26 @@ struct ContentView: View {
             }
         }
         .transaction { $0.animation = nil }
+        // Shown at most once per archive event. A parent who opens the app to find
+        // it empty deserves an explanation and the knowledge that a copy still
+        // exists, rather than concluding the app threw their child's history away.
+        .alert("Starting Fresh", isPresented: $showStoreRecoveryNotice) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Sproutly couldn't open its saved data on this device, so it started a new library. A backup copy of the old one is kept on this device — please reach out before reinstalling if you'd like help recovering it.")
+        }
         .task {
             guard !hasImported else { return }
             hasImported = true
+
+            // The flag is set during container construction, before any view exists,
+            // so it is read here rather than observed.
+            if StoreRecovery.didArchiveStore,
+               !UserDefaults.standard.bool(forKey: StoreRecovery.didShowNoticeKey) {
+                UserDefaults.standard.set(true, forKey: StoreRecovery.didShowNoticeKey)
+                showStoreRecoveryNotice = true
+            }
+
             // Adopts any pre-multi-child data into a real Child.
             childStore.importLegacyProfileIfNeeded()
 

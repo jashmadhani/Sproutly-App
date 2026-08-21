@@ -63,7 +63,7 @@ final class PurchaseManager {
                 state = .failed("Sproutly Pro isn't available right now. Please try again later.")
             }
         } catch {
-            print("⚠️ Sproutly: could not load product — \(error.localizedDescription)")
+            sproutlyLog("could not load product — \(error.localizedDescription)")
             state = .failed("Couldn't reach the App Store. Check your connection and try again.")
         }
     }

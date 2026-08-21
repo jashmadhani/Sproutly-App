@@ -58,7 +58,7 @@ enum PhotoStore {
             try jpeg.write(to: destination, options: .atomic)
             return destination.lastPathComponent
         } catch {
-            print("⚠️ Sproutly: could not save milestone photo — \(error.localizedDescription)")
+            sproutlyLog("could not save milestone photo — \(error.localizedDescription)")
             return nil
         }
     }

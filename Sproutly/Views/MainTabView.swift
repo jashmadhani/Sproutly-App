@@ -130,6 +130,7 @@ struct MainTabView: View {
     }
 }
 
+#if DEBUG
 #Preview {
 
     MainTabView()
@@ -138,3 +139,4 @@ struct MainTabView: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif

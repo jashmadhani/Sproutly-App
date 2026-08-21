@@ -88,7 +88,7 @@ enum ShareRenderer {
             try data.write(to: url, options: .atomic)
             return url
         } catch {
-            print("⚠️ Sproutly: could not write share card — \(error.localizedDescription)")
+            sproutlyLog("could not write share card — \(error.localizedDescription)")
             return nil
         }
     }

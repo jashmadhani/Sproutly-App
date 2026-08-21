@@ -58,7 +58,9 @@ struct AboutDataView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     AboutDataView()
         .environment(ThemeManager())
 }
+#endif

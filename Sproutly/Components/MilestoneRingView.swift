@@ -68,9 +68,11 @@ struct MilestoneRingView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ZStack {
         Color(hex: 0xFAF8F4).ignoresSafeArea()
         MilestoneRingView(progress: 0.65, completedCount: 4, totalCount: 6)
     }
 }
+#endif

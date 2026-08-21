@@ -428,6 +428,7 @@ struct DashboardView: View {
 
 // MARK: - Preview
 
+#if DEBUG
 #Preview {
 
     DashboardView()
@@ -436,3 +437,4 @@ struct DashboardView: View {
         .environment(ThemeManager())
         .modelContainer(previewContainer)
 }
+#endif
