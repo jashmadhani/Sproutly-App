@@ -95,17 +95,17 @@ struct DashboardView: View {
     // every option here is a decision a tired parent has to make in a waiting room.
     private var reportCard: some View {
         Button {
-            guard purchases.isPro else {
-                paywallReason = .report
-                return
-            }
             guard let active = childStore.activeChild, !isBuildingReport else { return }
-            isBuildingReport = true
-            // Rendering is synchronous CPU work on the main actor (ImageRenderer
-            // requires it). Without yielding first, SwiftUI never gets a frame
-            // to paint the spinner before the freeze — the button just looks
-            // hung until the PDF pops out. One yield lets that frame land.
             Task { @MainActor in
+                guard await purchases.isUnlocked() else {
+                    paywallReason = .report
+                    return
+                }
+                isBuildingReport = true
+                // Rendering is synchronous CPU work on the main actor (ImageRenderer
+                // requires it). Without yielding first, SwiftUI never gets a frame
+                // to paint the spinner before the freeze — the button just looks
+                // hung until the PDF pops out. One yield lets that frame land.
                 await Task.yield()
                 let report = ReportBuilder.build(for: active)
                 if let url = ShareRenderer.pdf(for: report) {

@@ -32,6 +32,7 @@ struct AssistantView: View {
                 VStack(spacing: 20) {
                     headerSection
                     assistantCard
+                    disclaimerFooter
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -89,6 +90,30 @@ struct AssistantView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Disclaimer
+
+    // This tab takes a worried parent's free-text question and answers it with
+    // tailored guidance, which is the one place in the app that could be read as
+    // clinical. The individual responses each defer to a pediatrician, but the
+    // screen itself carried no standing disclaimer — the only one a parent ever
+    // saw was onboarding step 4, once at install. It belongs here permanently,
+    // where the question is actually being asked.
+    private var disclaimerFooter: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.caption)
+                .foregroundStyle(theme.textSecondary.opacity(0.7))
+
+            Text("Sproutly is an educational tool, not medical advice. \(Theme.pediatricianReassurance)")
+                .font(Theme.sproutlyMeta)
+                .foregroundStyle(theme.textSecondary.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Assistant Card

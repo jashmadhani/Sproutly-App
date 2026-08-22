@@ -265,10 +265,14 @@ struct SettingsView: View {
 
             Button {
                 // The first child is free; a second is where Pro begins.
-                if purchases.isPro || childStore.children.isEmpty {
+                if childStore.children.isEmpty {
                     activeSheet = .addChild
                 } else {
-                    activeSheet = .paywall(.secondChild)
+                    Task { @MainActor in
+                        activeSheet = await purchases.isUnlocked()
+                            ? .addChild
+                            : .paywall(.secondChild)
+                    }
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -409,7 +413,9 @@ struct SettingsView: View {
     // the paywall naming the feature, rather than a disabled row.
     private var appIconSection: some View {
         Button {
-            activeSheet = purchases.isPro ? .appIcon : .paywall(.appIcon)
+            Task { @MainActor in
+                activeSheet = await purchases.isUnlocked() ? .appIcon : .paywall(.appIcon)
+            }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "app.badge")

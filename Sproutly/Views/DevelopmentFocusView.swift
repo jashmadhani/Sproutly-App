@@ -136,7 +136,11 @@ struct DevelopmentFocusView: View {
         case .reviewSuggested:
             return "A few earlier milestones are still developing. This is very common \u{2014} every child grows at their own pace. Continue observing through everyday play and routines."
         case .needsAttention:
-            return "Some milestones are missing or delayed. It’s important to talk with your child’s doctor to understand next steps — and how you can help."
+            // Deliberately observational. "Missing or delayed" plus "it's important to"
+            // read as a finding about the child rather than as something noticed, which
+            // is the one place the copy drifted from the tone rule the rest of the app
+            // keeps. Says the same thing without handing the parent a verdict.
+            return "Several milestones for this age haven’t been logged yet. Your child’s doctor is a good person to talk this through with — and to suggest ways you can help."
         }
     }
 

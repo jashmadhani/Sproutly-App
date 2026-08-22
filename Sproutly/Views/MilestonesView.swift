@@ -199,10 +199,12 @@ struct MilestonesView: View {
             Spacer()
 
             Button {
-                if purchases.isPro {
-                    showAddMilestone = true
-                } else {
-                    paywallReason = .customMilestone
+                Task { @MainActor in
+                    if await purchases.isUnlocked() {
+                        showAddMilestone = true
+                    } else {
+                        paywallReason = .customMilestone
+                    }
                 }
             } label: {
                 HStack(spacing: 5) {
@@ -450,16 +452,18 @@ struct MilestonesView: View {
         .contextMenu {
             if milestone.isCompleted {
                 Button {
-                    guard purchases.isPro else {
-                        paywallReason = .shareCard
-                        return
-                    }
-                    if let url = ShareRenderer.card(
-                        for: milestone,
-                        childName: child.displayName,
-                        nightMode: theme.isNightMode
-                    ) {
-                        shareItem = ShareItem(url: url)
+                    Task { @MainActor in
+                        guard await purchases.isUnlocked() else {
+                            paywallReason = .shareCard
+                            return
+                        }
+                        if let url = ShareRenderer.card(
+                            for: milestone,
+                            childName: child.displayName,
+                            nightMode: theme.isNightMode
+                        ) {
+                            shareItem = ShareItem(url: url)
+                        }
                     }
                 } label: {
                     Label("Share this moment", systemImage: "square.and.arrow.up")

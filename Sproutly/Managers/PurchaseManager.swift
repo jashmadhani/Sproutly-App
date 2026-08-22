@@ -84,6 +84,25 @@ final class PurchaseManager {
         hasCheckedEntitlements = true
     }
 
+    // MARK: - Gating
+
+    /// Answers "may this parent use a Pro feature?" for the gates that present the
+    /// paywall on tap.
+    ///
+    /// Reading `isPro` directly is wrong at those call sites: it is `false` both
+    /// when the parent hasn't bought Pro *and* during the window between launch and
+    /// `start()` completing, when the answer simply isn't known yet. A tap landing
+    /// in that window showed a paying customer a paywall for something they already
+    /// own. Awaiting the check here closes it — `currentEntitlements` is a local
+    /// read, so on the common path this returns immediately and the tap is never
+    /// swallowed or disabled.
+    func isUnlocked() async -> Bool {
+        if !hasCheckedEntitlements {
+            await refreshEntitlements()
+        }
+        return isPro
+    }
+
     // MARK: - Purchasing
 
     func purchase() async {
