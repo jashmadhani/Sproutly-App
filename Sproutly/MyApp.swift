@@ -123,9 +123,14 @@ private func archiveExistingStore() {
 // library each time until it runs out of space.
 private func pruneOldArchives(in directory: URL) {
     let fileManager = FileManager.default
+    // Deliberately prefetches no resource keys. Asking for .creationDateKey put
+    // the app in Apple's File Timestamp "required reason API" category, which
+    // PrivacyInfo.xcprivacy would then have to declare — and nothing here ever
+    // read the value, since pruning sorts on the timestamp baked into the
+    // filename rather than on the file's own creation date.
     guard let entries = try? fileManager.contentsOfDirectory(
         at: directory,
-        includingPropertiesForKeys: [.creationDateKey]
+        includingPropertiesForKeys: nil
     ) else { return }
 
     // Group by the timestamp embedded in the name so a store and its photo folder

@@ -49,6 +49,10 @@ targets:
         # no checked-in Info.plist to drift out of sync).
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Sproutly
+        # Sproutly makes no network calls and uses no encryption beyond what iOS
+        # applies to its own storage, which is exempt. Without this key App Store
+        # Connect blocks every upload on a manual export-compliance question.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES

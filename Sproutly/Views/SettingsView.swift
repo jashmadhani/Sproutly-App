@@ -64,6 +64,7 @@ struct SettingsView: View {
                     }
                     appIconSection
                     aboutSection
+                    legalSection
                     dataSection
                 }
                 .padding(.horizontal, 20)
@@ -456,6 +457,51 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .warmCard(nightMode: theme.isNightMode)
+    }
+
+    // MARK: - Legal
+
+    // Both links also live on the paywall, but that screen is reach-triggered and
+    // dismisses itself the moment `isPro` flips — so a parent who has already
+    // bought Pro, or who never happens to tap a gated feature, would have no way
+    // to open the privacy policy from inside the app at all. Guideline 5.1.1(i)
+    // wants it reachable in-app, not only in App Store Connect, so it needs a
+    // home on a screen that is always available.
+    private var legalSection: some View {
+        VStack(spacing: Theme.sectionSpacing) {
+            legalRow(
+                title: "Privacy Policy",
+                icon: "hand.raised",
+                destination: AppLinks.privacyPolicy
+            )
+            legalRow(
+                title: "Support",
+                icon: "questionmark.circle",
+                destination: AppLinks.support
+            )
+        }
+    }
+
+    private func legalRow(title: String, icon: String, destination: URL) -> some View {
+        Link(destination: destination) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundStyle(theme.textSecondary)
+                Text(title)
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(theme.text)
+                Spacer()
+                // Leaves the app, so it gets the system's outward arrow rather
+                // than the chevron the in-app sheets use.
+                Image(systemName: "arrow.up.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .warmCard(nightMode: theme.isNightMode)
+        .accessibilityLabel(title)
+        .accessibilityHint("Opens in Safari")
     }
     
     // MARK: - Data Management
