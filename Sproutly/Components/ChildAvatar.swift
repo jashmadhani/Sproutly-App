@@ -21,7 +21,7 @@ struct ChildAvatar: View {
             Text(child.initial)
                 .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
                 .foregroundStyle(
-                    Theme.accentBlue(for: nightMode).opacity(isActive ? 1 : 0.5)
+                    Theme.accentBlueText(for: nightMode).opacity(isActive ? 1 : 0.5)
                 )
         }
         .accessibilityHidden(true)

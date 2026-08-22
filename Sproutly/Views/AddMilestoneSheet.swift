@@ -15,6 +15,7 @@ struct AddMilestoneSheet: View {
     @Environment(ThemeManager.self) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var title: String = ""
     @State private var category: MilestoneCategory = .socialEmotional
@@ -129,7 +130,7 @@ struct AddMilestoneSheet: View {
                         }
                     }
                     .padding(20)
-                    .animation(.spring(response: 0.4), value: alreadyHappened)
+                    .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: alreadyHappened)
                 }
             }
             .navigationTitle("Add a Moment")

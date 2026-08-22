@@ -31,6 +31,7 @@ struct MilestonesView: View {
     private var child: Child { childStore.activeChild ?? Child() }
     private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedFilter: MilestoneFilter = .thisStage
     @State private var expandedDomains: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
@@ -222,7 +223,7 @@ struct MilestonesView: View {
                             .font(.caption2.weight(.semibold))
                     }
                 }
-                .foregroundStyle(theme.blue)
+                .foregroundStyle(theme.blueText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
@@ -392,7 +393,7 @@ struct MilestonesView: View {
                 isExpanded: expandedPhotoMilestone?.id == milestone.id
             ) {
                 expandedPhotoImage = nil
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                withAnimation(Theme.spring(0.4, reduceMotion: reduceMotion)) {
                     expandedPhotoMilestone = milestone
                 }
             }
@@ -524,7 +525,7 @@ struct MilestonesView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Add a memory", systemImage: "pencil.line")
                     .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.blue)
+                    .foregroundStyle(theme.blueText)
 
                 TextField("What made it special? (optional)", text: $noteText, axis: .vertical)
                     .lineLimit(1...3)
@@ -683,7 +684,7 @@ struct MilestonesView: View {
     }
 
     private func collapsePhoto() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+        withAnimation(Theme.spring(0.4, reduceMotion: reduceMotion)) {
             expandedPhotoMilestone = nil
         }
     }

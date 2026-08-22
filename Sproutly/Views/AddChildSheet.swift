@@ -11,6 +11,7 @@ struct AddChildSheet: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var name: String = ""
     @State private var birthDate: Date = Date()
@@ -88,7 +89,7 @@ struct AddChildSheet: View {
                         }
                     }
                     .padding(20)
-                    .animation(.spring(response: 0.4), value: isPremature)
+                    .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: isPremature)
                 }
             }
             .navigationTitle("Add a Child")

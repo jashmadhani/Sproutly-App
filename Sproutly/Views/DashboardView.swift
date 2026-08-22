@@ -31,6 +31,7 @@ struct DashboardView: View {
     private var child: Child { childStore.activeChild ?? Child() }
     private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var viewModel = DashboardViewModel()
     @State private var scrollOffset: CGFloat = 0
@@ -120,8 +121,8 @@ struct DashboardView: View {
                         .fill(theme.blue.opacity(0.12))
                         .frame(width: 44, height: 44)
                     Image(systemName: "doc.text")
-                        .font(.system(size: 19))
-                        .foregroundStyle(theme.blue)
+                        .sproutlyScaledFont(19, relativeTo: .body)
+                        .foregroundStyle(theme.blueText)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -139,8 +140,8 @@ struct DashboardView: View {
                     ProgressView()
                 } else {
                     Image(systemName: "square.and.arrow.up")
-                        .font(Theme.sproutlyRowIcon)
-                        .foregroundStyle(theme.blue)
+                        .sproutlyRowIcon()
+                        .foregroundStyle(theme.blueText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -209,24 +210,19 @@ struct DashboardView: View {
                 )
                 .frame(width: 160, height: 160)
 
-                VStack(spacing: 4) {
-                    Text("\(viewModel.currentStageCompleted)")
-                        .font(Theme.sproutlyStatNumber)
-                        .foregroundStyle(theme.text)
-
-                    Text("of \(viewModel.currentStageTotal) milestones")
-                        .font(Theme.sproutlyStatLabel)
-                        .foregroundStyle(theme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                // Inside the ring only while the text still fits there. Past the
+                // first accessibility step it moves below the ring instead
+                // (see `ringCaption`) — the circle is a fixed 160pt, so the
+                // alternative was clamping Dynamic Type, which caps the reader's
+                // own setting rather than adapting to it.
+                if !dynamicTypeSize.isAccessibilitySize {
+                    ringCaption
+                        .frame(maxWidth: 128)
                 }
-                .frame(maxWidth: 128)
-                // The ring is a fixed-size circle — text inside it can't grow
-                // without bound the way free-flowing text can. Dynamic Type
-                // still scales it (never frozen), just capped past the first
-                // accessibility step so "of 10 milestones" wraps to two lines
-                // inside the circle instead of spilling past its edge.
-                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            }
+
+            if dynamicTypeSize.isAccessibilitySize {
+                ringCaption
             }
 
             Text("\(viewModel.targetAgeMonth)-month milestones")
@@ -240,13 +236,36 @@ struct DashboardView: View {
         .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones completed for \(viewModel.targetAgeMonth) months")
     }
 
+    // The ring's count and label. Declared once and placed either inside the
+    // circle or beneath it depending on text size.
+    private var ringCaption: some View {
+        VStack(spacing: 4) {
+            Text("\(viewModel.currentStageCompleted)")
+                .sproutlyStatNumber()
+                .foregroundStyle(theme.text)
+
+            Text("of \(viewModel.currentStageTotal) milestones")
+                .font(Theme.sproutlyStatLabel)
+                .foregroundStyle(theme.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+    }
+
     // MARK: - Category Overview (Bento Grid)
 
     private var categoryOverview: some View {
-        let columns = [
-            GridItem(.flexible(), spacing: Theme.itemSpacing),
-            GridItem(.flexible(), spacing: Theme.itemSpacing)
-        ]
+        // Two columns normally, one at accessibility text sizes. A domain label
+        // like "Social & Feelings" cannot fit half a phone width at those sizes
+        // without truncating, and reflowing to a single column is what the
+        // reader asked for by turning text up — the previous version capped
+        // Dynamic Type here instead, which quietly overrode that choice.
+        let columns = dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: Theme.itemSpacing)]
+            : [
+                GridItem(.flexible(), spacing: Theme.itemSpacing),
+                GridItem(.flexible(), spacing: Theme.itemSpacing)
+            ]
 
         return VStack(alignment: .leading, spacing: Theme.itemSpacing) {
             Text("Growth Domains")
@@ -270,7 +289,7 @@ struct DashboardView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: category.icon)
-                    .font(.system(size: 17))
+                    .sproutlyScaledFont(17, relativeTo: .body)
                     .foregroundStyle(domainColor)
 
                 Spacer()
@@ -320,10 +339,6 @@ struct DashboardView: View {
                     .strokeBorder(domainColor.opacity(theme.isNightMode ? 0.5 : 0.4), lineWidth: 1.5)
             }
         )
-        // Two-column grid tile — same reasoning as the milestone ring: capped
-        // past the first accessibility step so the label reflows within the
-        // tile instead of truncating with an ellipsis.
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(category.gentleLabel), \(stats.completed) of \(stats.total) completed")
     }
@@ -355,8 +370,8 @@ struct DashboardView: View {
                 ForEach(viewModel.completedMilestones.prefix(3)) { milestone in
                     HStack(spacing: 14) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(theme.green)
+                            .sproutlyScaledFont(16, relativeTo: .subheadline)
+                            .foregroundStyle(theme.greenText)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(milestone.title)

@@ -54,7 +54,7 @@ struct AppIconPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(theme.blue)
+                        .foregroundStyle(theme.blueText)
                 }
             }
         }

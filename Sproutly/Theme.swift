@@ -45,6 +45,23 @@ extension Font {
 
 enum Theme {
 
+    // MARK: - Motion
+    //
+    // Reduce Motion is a system setting a parent turns on because springs make
+    // them queasy or disoriented, so honouring it in one screen and not the rest
+    // is worse than not honouring it at all. Every spring in the app routes
+    // through here. `nil` rather than a faster spring: the setting asks for the
+    // movement to be removed, not hurried — the view still changes, it just
+    // arrives instead of travelling. Fades are left alone; they carry no motion.
+
+    static func spring(
+        _ response: Double,
+        damping: Double = 0.85,
+        reduceMotion: Bool
+    ) -> Animation? {
+        reduceMotion ? nil : .spring(response: response, dampingFraction: damping)
+    }
+
     // MARK: - Type Scale
     //
     // A fixed set of roles so every screen draws from the same ramp instead of
@@ -76,15 +93,17 @@ enum Theme {
     /// Meta text — dates, counts. Never primary reading content.
     static let sproutlyMeta: Font = .system(.footnote)
 
-    /// Large numeric stat — the milestone-ring count.
-    static let sproutlyStatNumber: Font = .system(size: 40, weight: .bold, design: .rounded)
+    /// Large numeric stat — the milestone-ring count. Exposed as the
+    /// `.sproutlyStatNumber()` view modifier rather than a `Font` constant,
+    /// because `.system(size:)` produces a fixed font that ignores the reader's
+    /// text-size setting entirely. See `ScaledSystemFont`.
 
     /// Label directly under a large stat — "of 10 milestones".
     static let sproutlyStatLabel: Font = .system(.body).weight(.medium)
 
     /// Icon size for row-trailing affordance icons (share, chevron) that must
-    /// read clearly at a glance, not just meet the 44pt tap target.
-    static let sproutlyRowIcon: Font = .system(size: 20, weight: .semibold)
+    /// read clearly at a glance, not just meet the 44pt tap target. Exposed as
+    /// the `.sproutlyRowIcon()` view modifier — see `sproutlyStatNumber`.
 
     // MARK: - Day Mode Palette (Sage & Espresso)
 
@@ -102,14 +121,36 @@ enum Theme {
     /// 4.5:1 for normal text. This clears it with margin (~6.7:1).
     static let dayTextSecondary = Color(hex: 0x5F4F42)
 
-    /// Soft warm sky blue accent — #6FAED9
+    /// Soft warm sky blue accent — #6FAED9. A *surface* colour: tinted fills,
+    /// icon backdrops, ring strokes. Measured against the two backgrounds it
+    /// actually sits on it lands at 2.40:1 on the white card and 2.07:1 on the
+    /// sage background — roughly half of WCAG AA's 4.5:1 — so it must never
+    /// carry text or a UI-scale icon. Use `dayBlueText` for those.
     static let dayBlue = Color(hex: 0x6FAED9)
 
-    /// Leaf green — #6FA37A
+    /// Text-weight blue — #2F6E96. Same hue family as `dayBlue`, darkened until
+    /// it clears AA on both surfaces: 5.54:1 on the white card, 4.76:1 on the
+    /// sage background. Everything a parent reads or taps as text uses this;
+    /// large decorative glyphs sitting on a `dayBlue` tinted circle stay on
+    /// `dayBlue`, since decoration paired with a real text label is exempt.
+    static let dayBlueText = Color(hex: 0x2F6E96)
+
+    /// Leaf green — #6FA37A. Surface colour, like `dayBlue`: 2.92:1 on the white
+    /// card, so it fills and tints but never carries text or a read glyph.
     static let dayGreen = Color(hex: 0x6FA37A)
-    
-    /// Gentle butter encouragement yellow — #F4DFA5
+
+    /// Text-weight green — #3F7050. 5.76:1 on the white card, 4.95:1 on sage.
+    static let dayGreenText = Color(hex: 0x3F7050)
+
+    /// Gentle butter encouragement yellow — #F4DFA5. The most surface-only of the
+    /// three: at 1.32:1 on white it is barely distinguishable from the card it
+    /// sits on, which is exactly what it's for as a soft highlight fill — and
+    /// exactly why it can't be a text colour.
     static let dayYellow = Color(hex: 0xF4DFA5)
+
+    /// Text-weight amber — #7D5F18. 5.96:1 on the white card, 5.12:1 on sage.
+    /// The same "gentle warning" role as `dayYellow`, dark enough to read.
+    static let dayYellowText = Color(hex: 0x7D5F18)
     
     // MARK: - Night Mode Palette (Nursery-Inspired)
     
@@ -155,6 +196,13 @@ enum Theme {
     
     static func accentBlue(for nightMode: Bool) -> Color {
         nightMode ? nightBlue : dayBlue
+    }
+
+    /// The accent as used on text and UI-scale icons. Night mode needs no
+    /// separate value — `nightBlue` already measures 6.64:1 on `nightCard` —
+    /// so only the day side changes.
+    static func accentBlueText(for nightMode: Bool) -> Color {
+        nightMode ? nightBlue : dayBlueText
     }
 
     // MARK: - Purchase CTA
@@ -241,6 +289,17 @@ enum Theme {
     
     static func encourageYellow(for nightMode: Bool) -> Color {
         nightMode ? nightGold : dayYellow
+    }
+
+    /// Green as used on text and read glyphs. Night needs no separate value —
+    /// `nightGreen` measures 5.98:1 on `nightCard`.
+    static func growthGreenText(for nightMode: Bool) -> Color {
+        nightMode ? nightGreen : dayGreenText
+    }
+
+    /// Amber as used on text. `nightGold` already measures 7.86:1 on `nightCard`.
+    static func encourageYellowText(for nightMode: Bool) -> Color {
+        nightMode ? nightGold : dayYellowText
     }
     
     // MARK: - Static Aliases (Day Mode defaults for convenience)
@@ -371,6 +430,62 @@ extension View {
     }
 }
 
+// MARK: - Scalable System Font
+
+/// A system font at a custom point size that still honours the reader's
+/// text-size setting.
+///
+/// `Font.system(size:)` is frozen — it ignores Dynamic Type completely, so a
+/// parent who has turned text up sees every other label grow while these stay
+/// put, which breaks the hierarchy exactly where it matters most. `@ScaledMetric`
+/// scales the point size against a named text style, and it works inside a
+/// `ViewModifier` the same as in a `View`, so the scaling lives here instead of
+/// being re-declared at every call site.
+struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+    private let design: Font.Design
+
+    init(
+        size: CGFloat,
+        relativeTo textStyle: Font.TextStyle,
+        weight: Font.Weight = .regular,
+        design: Font.Design = .default
+    ) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight, design: design))
+    }
+}
+
+extension View {
+    /// A system font at `size` that grows with the reader's text-size setting.
+    func sproutlyScaledFont(
+        _ size: CGFloat,
+        relativeTo textStyle: Font.TextStyle,
+        weight: Font.Weight = .regular,
+        design: Font.Design = .default
+    ) -> some View {
+        modifier(ScaledSystemFont(
+            size: size, relativeTo: textStyle, weight: weight, design: design
+        ))
+    }
+
+    /// Large numeric stat — the milestone-ring count.
+    func sproutlyStatNumber() -> some View {
+        sproutlyScaledFont(40, relativeTo: .largeTitle, weight: .bold, design: .rounded)
+    }
+
+    /// Row-trailing affordance icons (share, chevron).
+    func sproutlyRowIcon() -> some View {
+        sproutlyScaledFont(20, relativeTo: .body, weight: .semibold)
+    }
+}
+
 // MARK: - Gradient Button Style
 
 
@@ -378,6 +493,10 @@ struct SoftCapsuleStyle: ButtonStyle {
     var baseColor: Color
     var isAction: Bool = false
     var nightMode: Bool = false
+
+    // A ButtonStyle reads the environment like any other view, so the press
+    // spring can be gated here rather than at every call site.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -407,7 +526,7 @@ struct SoftCapsuleStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(Theme.spring(0.2, damping: 0.7, reduceMotion: reduceMotion), value: configuration.isPressed)
     }
 }
 

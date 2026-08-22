@@ -360,7 +360,7 @@ private extension OnboardingView {
     func fieldLabel(_ text: String, systemImage: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(theme.blue)
+                .foregroundStyle(theme.blueText)
             Text(text)
                 .foregroundStyle(theme.textSecondary)
         }
@@ -376,8 +376,8 @@ private extension OnboardingView {
                     .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundStyle(theme.blue)
+                    .sproutlyScaledFont(18, relativeTo: .body)
+                    .foregroundStyle(theme.blueText)
             }
 
             VStack(alignment: .leading, spacing: 2) {

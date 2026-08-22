@@ -53,6 +53,7 @@ struct DevelopmentFocusView: View {
     let nightMode: Bool
 
     @State private var showEarlyIntervention = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Accent Color
 
@@ -203,14 +204,14 @@ struct DevelopmentFocusView: View {
 
     private var earlyInterventionToggle: some View {
         Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+            withAnimation(Theme.spring(0.35, damping: 1.0, reduceMotion: reduceMotion)) {
                 showEarlyIntervention.toggle()
             }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "book.closed")
                     .font(.caption)
-                    .foregroundStyle(Theme.accentBlue(for: nightMode))
+                    .foregroundStyle(Theme.accentBlueText(for: nightMode))
                     .frame(width: 20)
 
                 Text("What is Early Intervention?")
@@ -254,14 +255,14 @@ struct DevelopmentFocusView: View {
         }
         .padding(.leading, 28)
         .transition(.opacity)
-        .animation(.spring(response: 0.35, dampingFraction: 1.0), value: showEarlyIntervention)
+        .animation(Theme.spring(0.35, damping: 1.0, reduceMotion: reduceMotion), value: showEarlyIntervention)
     }
 
     private func interventionPoint(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundStyle(Theme.accentBlue(for: nightMode))
+                .foregroundStyle(Theme.accentBlueText(for: nightMode))
                 .frame(width: 16)
 
             Text(text)

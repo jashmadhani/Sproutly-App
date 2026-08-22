@@ -92,8 +92,12 @@ struct MainTabView: View {
                             .font(.system(size: 25, weight: .medium))
                             .frame(width: 32, height: 28)
 
+                        // 11pt is the platform floor for legible text; this sat at
+                        // 10. Deliberately NOT scaled with Dynamic Type — tab
+                        // titles are the one place the guidance says to hold
+                        // size, since growing them pushes the bar into content.
                         Text(tab.rawValue)
-                            .font(.system(size: 10, weight: isSelected ? .semibold : .regular, design: .rounded))
+                            .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .rounded))
                     }
                     .foregroundStyle(
                         isSelected ? theme.blue : theme.textSecondary.opacity(0.8)

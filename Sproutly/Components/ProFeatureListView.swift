@@ -16,8 +16,8 @@ struct ProFeatureListView: View {
             ForEach(PaywallReason.allFeatures, id: \.title) { feature in
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: feature.icon)
-                        .font(.system(size: 17))
-                        .foregroundStyle(theme.blue)
+                        .sproutlyScaledFont(17, relativeTo: .body)
+                        .foregroundStyle(theme.blueText)
                         .frame(width: 26)
 
                     VStack(alignment: .leading, spacing: 3) {

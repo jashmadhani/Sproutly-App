@@ -42,6 +42,12 @@ struct ScreeningCardView: View {
         let cardColor = isOverdue
             ? Theme.encourageYellow(for: nightMode)
             : Theme.accentBlue(for: nightMode)
+        // The 0.12 circle behind the glyph is a surface, but the glyph itself is
+        // read, so the two can't share one value — the surface blue lands at
+        // 2.40:1 on the card underneath.
+        let glyphColor = isOverdue
+            ? Theme.encourageYellow(for: nightMode)
+            : Theme.accentBlueText(for: nightMode)
         
         return HStack(alignment: .top, spacing: 14) {
             ZStack {
@@ -50,8 +56,8 @@ struct ScreeningCardView: View {
                     .frame(width: 40, height: 40)
                 
                 Image(systemName: screening.icon)
-                    .font(.system(size: 18))
-                    .foregroundStyle(cardColor)
+                    .sproutlyScaledFont(18, relativeTo: .body)
+                    .foregroundStyle(glyphColor)
             }
             
             VStack(alignment: .leading, spacing: 6) {
@@ -63,7 +69,7 @@ struct ScreeningCardView: View {
                     if isOverdue {
                         Text("Past due")
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Theme.encourageYellow(for: nightMode))
+                            .foregroundStyle(Theme.encourageYellowText(for: nightMode))
                     }
                 }
                 

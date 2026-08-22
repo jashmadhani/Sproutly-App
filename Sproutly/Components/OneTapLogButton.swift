@@ -38,12 +38,17 @@ struct OneTapLogButton: View {
                     .frame(width: 36, height: 36)
 
                 Image(systemName: isCompleted ? "checkmark" : "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .sproutlyScaledFont(14, relativeTo: .footnote, weight: .semibold)
                     .foregroundStyle(
-                        isCompleted ? .white : Theme.accentBlue(for: nightMode)
+                        isCompleted ? .white : Theme.accentBlueText(for: nightMode)
                     )
             }
             .animation(.easeOut(duration: 0.15), value: isCompleted)
+            // The circle stays 36pt visually — 44 would crowd the milestone row —
+            // but the tap target is padded out to the 44x44 the HIG asks for.
+            // This is the most-repeated control in the app, so it should be the
+            // most forgiving one to hit, not the tightest.
+            .frame(width: 44, height: 44)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

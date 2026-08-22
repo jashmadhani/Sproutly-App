@@ -16,6 +16,7 @@ struct SettingsView: View {
     private var child: Child { childStore.activeChild ?? Child() }
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @State private var showResetAlert = false
     @State private var showDeleteAlert = false
@@ -149,7 +150,7 @@ struct SettingsView: View {
     private func fieldLabel(_ text: String, systemImage: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(theme.blue)
+                .foregroundStyle(theme.blueText)
             Text(text)
                 .foregroundStyle(theme.textSecondary)
         }
@@ -183,8 +184,8 @@ struct SettingsView: View {
                     .frame(width: 40, height: 40)
                 
                 Image(systemName: theme.isNightMode ? "moon.stars.fill" : "moon.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(theme.blue)
+                    .sproutlyScaledFont(18, relativeTo: .body)
+                    .foregroundStyle(theme.blueText)
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -241,7 +242,7 @@ struct SettingsView: View {
 
                                 if isActive {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(theme.green)
+                                        .foregroundStyle(theme.greenText)
                                 }
                             }
                         }
@@ -277,7 +278,7 @@ struct SettingsView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(theme.blue)
+                        .foregroundStyle(theme.blueText)
                     Text("Add a child")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
@@ -380,7 +381,7 @@ struct SettingsView: View {
             }
         }
         .warmCard(nightMode: theme.isNightMode)
-        .animation(.spring(response: 0.4), value: child.isPremature)
+        .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: child.isPremature)
     }
     
     // MARK: - Pro Features

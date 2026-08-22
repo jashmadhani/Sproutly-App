@@ -12,13 +12,14 @@ struct GrowthInsightsView: View {
     let nightMode: Bool
 
     @State private var expandedSection: String? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Section header
             Label("Growth Insights", systemImage: "lightbulb.fill")
                 .font(Theme.sproutlySectionHeader)
-                .foregroundStyle(Theme.accentBlue(for: nightMode))
+                .foregroundStyle(Theme.accentBlueText(for: nightMode))
 
             // Collapsible educational rows
             insightRow(
@@ -87,14 +88,14 @@ struct GrowthInsightsView: View {
     private func insightRow(id: String, icon: String, title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                withAnimation(Theme.spring(0.35, damping: 1.0, reduceMotion: reduceMotion)) {
                     expandedSection = expandedSection == id ? nil : id
                 }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: icon)
                         .font(.subheadline)
-                        .foregroundStyle(Theme.accentBlue(for: nightMode))
+                        .foregroundStyle(Theme.accentBlueText(for: nightMode))
                         .frame(width: 20)
 
                     Text(title)
@@ -126,6 +127,6 @@ struct GrowthInsightsView: View {
         }
         .padding(.vertical, 2)
         .clipped()
-        .animation(.spring(response: 0.35, dampingFraction: 1.0), value: expandedSection)
+        .animation(Theme.spring(0.35, damping: 1.0, reduceMotion: reduceMotion), value: expandedSection)
     }
 }

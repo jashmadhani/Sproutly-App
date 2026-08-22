@@ -31,7 +31,12 @@ final class ThemeManager {
     var text: Color { Theme.textPrimary(for: isNightMode) }
     var textSecondary: Color { Theme.textSecondary(for: isNightMode) }
     var blue: Color { Theme.accentBlue(for: isNightMode) }
+    /// Use for text and UI-scale icons; `blue` is a surface tint that fails
+    /// contrast on both day backgrounds.
+    var blueText: Color { Theme.accentBlueText(for: isNightMode) }
     var green: Color { Theme.growthGreen(for: isNightMode) }
+    /// Use for text and read glyphs; `green` is a surface tint.
+    var greenText: Color { Theme.growthGreenText(for: isNightMode) }
     var ctaGradient: LinearGradient { Theme.ctaGradient(for: isNightMode) }
     var ctaShadow: Color { Theme.ctaShadow(for: isNightMode) }
     var proGold: Color { Theme.proGold(for: isNightMode) }

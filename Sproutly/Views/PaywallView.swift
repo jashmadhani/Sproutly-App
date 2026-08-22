@@ -199,7 +199,7 @@ struct PaywallView: View {
                 Task { await purchases.restore() }
             }
             .font(Theme.sproutlyCardTitle)
-            .foregroundStyle(theme.blue)
+            .foregroundStyle(theme.blueText)
             .disabled(purchases.state == .purchasing)
 
             HStack(spacing: 18) {

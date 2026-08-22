@@ -29,8 +29,8 @@ struct SupportAssistantView: View {
                         .frame(width: 36, height: 36)
                     
                     Image(systemName: "sparkles")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Theme.accentBlue(for: nightMode))
+                        .sproutlyScaledFont(16, relativeTo: .subheadline)
+                        .foregroundStyle(Theme.accentBlueText(for: nightMode))
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -65,7 +65,7 @@ struct SupportAssistantView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(Theme.accentBlue(for: nightMode))
+                            .foregroundStyle(Theme.accentBlueText(for: nightMode))
                     }
                     .buttonStyle(.plain)
                     .transition(.scale.combined(with: .opacity))
@@ -97,13 +97,13 @@ struct SupportAssistantView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Gentle ideas to try:")
                                 .font(Theme.sproutlyCardTitle)
-                                .foregroundStyle(Theme.accentBlue(for: nightMode))
+                                .foregroundStyle(Theme.accentBlueText(for: nightMode))
 
                             ForEach(resp.activities, id: \.self) { activity in
                                 HStack(alignment: .top, spacing: 8) {
                                     Text("•")
                                         .font(Theme.sproutlyBody)
-                                        .foregroundStyle(Theme.growthGreen(for: nightMode))
+                                        .foregroundStyle(Theme.growthGreenText(for: nightMode))
                                     Text(activity)
                                         .font(Theme.sproutlyBody)
                                         .foregroundStyle(Theme.textSecondary(for: nightMode))

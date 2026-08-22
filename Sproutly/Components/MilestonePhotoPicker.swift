@@ -31,7 +31,7 @@ struct MilestonePhotoPicker: View {
             HStack(spacing: 8) {
                 Label("Add a photo", systemImage: "photo")
                     .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(Theme.accentBlue(for: isNight))
+                    .foregroundStyle(Theme.accentBlueText(for: isNight))
 
                 if showNewHint {
                     Text("New")
