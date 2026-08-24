@@ -37,6 +37,7 @@ struct MilestonesView: View {
     @State private var expandedDomains: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
     @State private var milestoneForNote: Milestone? = nil
     @State private var noteText: String = ""
+    @FocusState private var isNoteFocused: Bool
     @State private var milestoneToUncheck: Milestone? = nil
     @State private var showRemoveAlert: Bool = false
     @State private var showAddMilestone: Bool = false
@@ -141,7 +142,7 @@ struct MilestonesView: View {
             completionNoteSheet(for: milestone)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(theme.isNightMode ? Theme.nightCard : Color.white)
+                .presentationBackground(theme.card)
         }
         .alert("Remove Milestone?", isPresented: $showRemoveAlert, presenting: milestoneToUncheck) { milestone in
             Button("Cancel", role: .cancel) { milestoneToUncheck = nil }
@@ -235,36 +236,74 @@ struct MilestonesView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Add a moment")
-            .accessibilityHint("Record your own milestone for \(child.displayName)")
+            .accessibilityHint("Saves a moment of your own for \(child.displayName)")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
     }
 
+    // The age itself is unchanged — `correctedAge` is still what drives every
+    // milestone decision. Only the label changes: a full-term child's parent has
+    // no reason to be shown the words "corrected age", and for a premature child
+    // the adjustment is named in words rather than jargon.
     private var ageDescription: String {
         let months = correctedAge
+        let base: String
         if months < 24 {
-            return "\(months) month\(months == 1 ? "" : "s") corrected age"
+            base = "\(months) month\(months == 1 ? "" : "s")"
         } else {
             let years = months / 12
             let rem = months % 12
-            if rem == 0 {
-                return "\(years) year\(years == 1 ? "" : "s") corrected age"
-            }
-            return "\(years)y \(rem)m corrected age"
+            base = rem == 0
+                ? "\(years) year\(years == 1 ? "" : "s")"
+                : "\(years)y \(rem)m"
         }
+        return child.isPremature ? "\(base) · adjusted for arriving early" : base
     }
 
     // MARK: - Filter Picker
 
+    // A hand-built segmented control rather than `.pickerStyle(.segmented)`.
+    //
+    // UIKit draws that one on a #CCD8CC track — 1.13:1 against the page, so it
+    // barely separates — and gives the selected segment a *pure white* pill.
+    // Pure white is now the floating dock and nothing else; a second pure-white
+    // surface halfway up the screen breaks the ladder that separation depends
+    // on. The selected pill is the card colour, which is what every other
+    // raised surface in the app uses.
     private var filterPicker: some View {
-        Picker("Filter", selection: $selectedFilter) {
+        HStack(spacing: 4) {
             ForEach(MilestoneFilter.allCases, id: \.self) { filter in
-                Text(filter.rawValue).tag(filter)
+                let isSelected = selectedFilter == filter
+                Button {
+                    selectedFilter = filter
+                } label: {
+                    Text(filter.rawValue)
+                        .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? theme.text : theme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 36)
+                        .background(
+                            RoundedRectangle(cornerRadius: 999, style: .continuous)
+                                .fill(isSelected ? theme.card : Color.clear)
+                                .shadow(
+                                    color: isSelected ? theme.cardShadow : .clear,
+                                    radius: 4, x: 0, y: 2
+                                )
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .pickerStyle(.segmented)
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 999, style: .continuous)
+                .fill(theme.recessedFill)
+        )
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Milestone filter")
     }
 
@@ -276,7 +315,13 @@ struct MilestonesView: View {
         // same milestone list.
         let filtered = filteredMilestones
         let grouped = Dictionary(grouping: filtered, by: \.category)
-        let showAll = selectedFilter == .thisStage || selectedFilter == .all
+        // "This Stage" is a to-do list, so a domain with nothing to notice right
+        // now has nothing to say. It used to be in here with `.all`, which meant
+        // all five domains rendered whatever the filter — and on a 7-month-old
+        // that opened the tab on two ~350pt cards reading "0 of 0 — No
+        // milestones in this filter." A third of the screen spent saying
+        // nothing. If every domain is empty, `isEmpty` below still explains why.
+        let showAll = selectedFilter == .all
         let isEmpty = filtered.isEmpty
 
         // LazyVStack, not VStack — with every domain expanded by default this
@@ -355,16 +400,17 @@ struct MilestonesView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(category.gentleLabel), \(stats.completed) of \(stats.total)")
-            .accessibilityHint(isExpanded ? "Double tap to collapse" : "Double tap to expand")
+            .accessibilityHint(isExpanded ? "Collapses this area" : "Expands this area")
 
             // Expanded milestone rows
             if isExpanded {
                 VStack(spacing: Theme.itemSpacing) {
                     if milestones.isEmpty {
-                        Text("No milestones in this filter.")
+                        Text("Nothing here yet.")
                             .font(Theme.sproutlyBody)
                             .foregroundStyle(theme.textSecondary)
-                            .padding(.bottom, 12)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                     } else {
                         ForEach(milestones) { milestone in
                             milestoneRow(milestone)
@@ -438,8 +484,12 @@ struct MilestonesView: View {
                 handleToggle(milestone)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 14)
+        // A single 12pt inset rather than 10/14. The row sits inside a card that
+        // already pays Theme.cardPadding, so this is the second inset in one
+        // level of hierarchy — keeping it on the grid and symmetric stops the
+        // doubling from compounding. The fill itself stays: it is what makes
+        // rows read as separate, and the green carries completion state.
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
@@ -491,7 +541,7 @@ struct MilestonesView: View {
                 .foregroundStyle(theme.textSecondary)
 
             Text(selectedFilter == .completed
-                 ? "No milestones completed yet.\nTap + to celebrate a moment!"
+                 ? "Nothing saved yet.\nTap the circle beside a milestone when you notice it."
                  : "No milestones available.")
                 .font(.subheadline)
                 .foregroundStyle(theme.textSecondary)
@@ -510,7 +560,7 @@ struct MilestonesView: View {
                     .font(.system(size: 36))
                     .foregroundStyle(theme.green)
 
-                Text("Moment Captured!")
+                Text("Saved")
                     .font(.sproutlyDisplay(24))
                     .foregroundStyle(theme.text)
 
@@ -523,23 +573,26 @@ struct MilestonesView: View {
 
             // Note field
             VStack(alignment: .leading, spacing: 8) {
-                Label("Add a memory", systemImage: "pencil.line")
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.blueText)
+                Label("Add a note", systemImage: "pencil.line")
+                    .font(Theme.sproutlyFieldLabel)
+                    .foregroundStyle(theme.textSecondary)
 
-                TextField("What made it special? (optional)", text: $noteText, axis: .vertical)
+                TextField(
+                    "",
+                    text: $noteText,
+                    prompt: Text("What made it special? (optional)")
+                        .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode)),
+                    axis: .vertical
+                )
                     .lineLimit(1...3)
-                    .font(Theme.sproutlyBody)
+                    .font(Theme.sproutlyFieldValue)
                     .foregroundStyle(theme.text)
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(theme.text.opacity(0.04))
+                    .focused($isNoteFocused)
+                    .underlineField(
+                        nightMode: theme.isNightMode,
+                        isFocused: isNoteFocused
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(theme.blue.opacity(0.1), lineWidth: 1)
-                    )
+                    .accessibilityLabel("Add a note")
             }
 
             // Photo — offered, never required. The one-tap log stays one tap;
@@ -573,11 +626,12 @@ struct MilestonesView: View {
                             .font(Theme.sproutlyMeta)
                     }
                     .foregroundStyle(theme.textSecondary)
-                    .padding(.vertical, 14)
                     .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 48)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(theme.text.opacity(0.04))
+                            .fill(theme.recessedFill)
                     )
                 }
                 .buttonStyle(.plain)
@@ -597,7 +651,7 @@ struct MilestonesView: View {
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(theme.text.opacity(0.08))
+                                .fill(theme.recessedFill)
                         )
                 }
                 .buttonStyle(.plain)
@@ -621,7 +675,7 @@ struct MilestonesView: View {
                     // the low-contrast, low-drama visual language everywhere else.
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
-                        Text("Save Memory")
+                        Text("Save")
                     }
                     .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.isNightMode ? Theme.ctaGreenBottomNight : Theme.ctaGreenBottom)
@@ -636,7 +690,7 @@ struct MilestonesView: View {
             }
         }
         .padding(24)
-        .background(theme.isNightMode ? Theme.nightCard : Color.white)
+        .background(theme.card)
     }
 
     // MARK: - Actions
@@ -702,23 +756,43 @@ private struct MilestoneThumbnail: View {
     let namespace: Namespace.ID
     let isExpanded: Bool
     let onTap: () -> Void
+    @Environment(ThemeManager.self) private var theme
     @State private var image: UIImage?
 
     var body: some View {
         Group {
-            if let image {
+            // Keyed on `photoFilename`, not on `image`.
+            //
+            // This used to be `if let image`, with `.task` hung off the Group.
+            // While `image` was nil the Group resolved to nothing, so there was
+            // no render node to host the modifier — the task never fired, the
+            // image never loaded, and the Group stayed empty. Self-locking: the
+            // thumbnail could never appear for a milestone that had a photo.
+            //
+            // Branching on the filename means the slot exists as soon as we know
+            // there is a photo, which gives `.task` a host and reserves the space
+            // so the row does not jump when the image lands.
+            if milestone.photoFilename != nil {
                 Button(action: onTap) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(theme.recessedFill)
                         .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay {
+                            if let image {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                        }
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
+                .disabled(image == nil)
                 // Hidden while its full-screen counterpart is showing —
                 // matchedGeometryEffect expects exactly one visible instance
                 // of a given id at a time; leaving both visible causes the

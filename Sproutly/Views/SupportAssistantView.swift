@@ -50,7 +50,13 @@ struct SupportAssistantView: View {
             
             // Input field
             HStack(spacing: 10) {
-                TextField("What's on your mind today?", text: $question, axis: .vertical)
+                TextField(
+                    "",
+                    text: $question,
+                    prompt: Text("What's on your mind today?")
+                        .foregroundColor(Theme.fieldPlaceholder(for: nightMode)),
+                    axis: .vertical
+                )
                     .lineLimit(1...4)
                     .font(Theme.sproutlyBody)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
@@ -72,15 +78,10 @@ struct SupportAssistantView: View {
                     .accessibilityLabel("Send question")
                 }
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Theme.textPrimary(for: nightMode).opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Theme.accentBlue(for: nightMode).opacity(isInputFocused ? 0.2 : 0.08), lineWidth: 1)
-            )
+            // Same rule as every other typed field in the app. This was the
+            // last boxed one — a #E6E2DD slab whose placeholder measured 1.67:1
+            // and which read as a component from another app.
+            .underlineField(nightMode: nightMode, isFocused: isInputFocused)
             .animation(.easeInOut(duration: 0.25), value: question.isEmpty)
             
             // Response area
@@ -95,7 +96,7 @@ struct SupportAssistantView: View {
                     // Activity suggestions
                     if !resp.activities.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Gentle ideas to try:")
+                            Text("Things to try:")
                                 .font(Theme.sproutlyCardTitle)
                                 .foregroundStyle(Theme.accentBlueText(for: nightMode))
 

@@ -268,7 +268,7 @@ struct DashboardView: View {
             ]
 
         return VStack(alignment: .leading, spacing: Theme.itemSpacing) {
-            Text("Growth Domains")
+            Text("Five areas of growth")
                 .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(theme.text)
                 .padding(.leading, 4)
@@ -310,7 +310,7 @@ struct DashboardView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(theme.text.opacity(0.06))
+                        .fill(theme.progressTrack)
                         .frame(height: 6)
 
                     Capsule()
@@ -323,31 +323,33 @@ struct DashboardView: View {
         }
         .padding(18)
         .background(
-            // An opaque pastel plate, not a translucent tint — at low opacity
-            // directly over AmbientBackground's blurred circles the tiles read
-            // as muddy and blend into the page instead of standing apart as cards.
-            // The border is a second, color-independent guarantee of a visible
-            // edge — opacity alone depends on how close the domain color's
-            // lightness sits to the page background, which varies by hue and
-            // by display; a stroke never disappears regardless.
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(theme.isNightMode ? Theme.nightCard : .white)
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(domainColor.opacity(theme.isNightMode ? 0.38 : 0.34))
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(domainColor.opacity(theme.isNightMode ? 0.5 : 0.4), lineWidth: 1.5)
-            }
+            // One opaque solved colour, not a card with an accent laid over it
+            // at an opacity. The old two-layer build meant the tile's final
+            // lightness depended on the accent's saturation, so the five tiles
+            // sat at five different distances from the background — see the
+            // "Domain Tile Surfaces" note in Theme. These land within 0.01 of
+            // each other.
+            //
+            // The shadow is the same one every other card uses, kept as
+            // reinforcement now that the tile clears the background on its own.
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(category.tileBackground(for: theme.isNightMode))
+                .shadow(
+                    color: theme.cardShadow,
+                    radius: theme.isNightMode ? 6 : 10,
+                    x: 0,
+                    y: theme.isNightMode ? 3 : 4
+                )
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(category.gentleLabel), \(stats.completed) of \(stats.total) completed")
+        .accessibilityLabel("\(category.gentleLabel), \(stats.completed) of \(stats.total) saved")
     }
 
-    // MARK: - Recent Moments
+    // MARK: - What you've noticed
 
     private var recentMomentsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Moments")
+            Text("What you've noticed")
                 .font(Theme.sproutlySectionHeader)
                 .foregroundStyle(theme.text)
                 .padding(.leading, 4)
@@ -356,7 +358,7 @@ struct DashboardView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .foregroundStyle(theme.textSecondary)
-                    Text("Moments you notice will appear here")
+                    Text("What you save will show up here")
                         .font(.subheadline)
                         .foregroundStyle(theme.textSecondary)
                 }
@@ -364,7 +366,7 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(theme.isNightMode ? Theme.nightCard : .white)
+                        .fill(theme.card)
                 )
             } else {
                 ForEach(viewModel.completedMilestones.prefix(3)) { milestone in
@@ -399,12 +401,10 @@ struct DashboardView: View {
                     .padding(.vertical, 14)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(theme.isNightMode ? Theme.nightCard : .white)
+                            .fill(theme.card)
                     )
                     .shadow(
-                        color: theme.isNightMode
-                            ? Color.black.opacity(0.2)
-                            : Theme.dayText.opacity(0.04),
+                        color: theme.cardShadow,
                         radius: 8,
                         x: 0,
                         y: 3

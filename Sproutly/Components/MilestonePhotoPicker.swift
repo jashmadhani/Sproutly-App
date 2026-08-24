@@ -74,14 +74,33 @@ private struct PickerLabel: View {
     let imageData: Data?
     let nightMode: Bool
 
+    /// Width-over-height, clamped to keep the sheet's buttons reachable.
+    /// 4:3 landscape at the wide end, 3:4 portrait at the tall end.
+    private func previewAspect(for image: UIImage) -> CGFloat {
+        guard image.size.height > 0 else { return 4.0 / 3.0 }
+        let actual = image.size.width / image.size.height
+        return min(max(actual, 3.0 / 4.0), 4.0 / 3.0)
+    }
+
     var body: some View {
         if let imageData, let image = UIImage(data: imageData) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(height: 120)
-                .frame(maxWidth: .infinity)
+            // The preview follows the photo's own shape instead of forcing every
+            // image into a 120pt letterbox, which cropped the top and bottom off
+            // anything portrait — i.e. most photos of a baby.
+            //
+            // Clamped rather than free: a very tall image left unbounded would
+            // push the Skip / Save buttons off the bottom of the sheet. Inside
+            // the clamp there is no crop at all; only an extreme panorama or a
+            // very tall portrait gets trimmed, and only to the nearest bound.
+            Color.clear
+                .aspectRatio(previewAspect(for: image), contentMode: .fit)
+                .overlay(
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(maxWidth: .infinity)
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "photo.badge.plus")
@@ -93,7 +112,7 @@ private struct PickerLabel: View {
             .padding(.vertical, 18)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Theme.textPrimary(for: nightMode).opacity(0.04))
+                    .fill(Theme.recessedFill(for: nightMode))
             )
         }
     }

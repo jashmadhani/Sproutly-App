@@ -189,6 +189,11 @@ struct ContentView: View {
     @Environment(ThemeManager.self) private var theme
     @Environment(PurchaseManager.self) private var purchases
     @Environment(\.scenePhase) private var scenePhase
+    // Read here and mirrored onto ThemeManager so the whole app resolves one
+    // set of colours, rather than each view reading the environment and
+    // deciding for itself. See ThemeManager's "Accessibility State".
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hasImported = false
     @State private var showStoreRecoveryNotice = false
 
@@ -201,6 +206,9 @@ struct ContentView: View {
             }
         }
         .transaction { $0.animation = nil }
+        .onAppear { syncAccessibilityState() }
+        .onChange(of: colorSchemeContrast) { _, _ in syncAccessibilityState() }
+        .onChange(of: reduceTransparency) { _, _ in syncAccessibilityState() }
         // Shown at most once per archive event. A parent who opens the app to find
         // it empty deserves an explanation and the knowledge that a copy still
         // exists, rather than concluding the app threw their child's history away.
@@ -235,6 +243,16 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, hasImported else { return }
             Task { await purchases.refreshEntitlements() }
+        }
+    }
+
+    /// Guarded so an unchanged value doesn't publish an @Observable mutation
+    /// and invalidate every view for nothing.
+    private func syncAccessibilityState() {
+        let increased = colorSchemeContrast == .increased
+        if theme.increaseContrast != increased { theme.increaseContrast = increased }
+        if theme.reduceTransparency != reduceTransparency {
+            theme.reduceTransparency = reduceTransparency
         }
     }
 }

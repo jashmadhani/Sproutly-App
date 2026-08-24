@@ -17,6 +17,7 @@ struct AddChildSheet: View {
     @State private var birthDate: Date = Date()
     @State private var isPremature: Bool = false
     @State private var gestationalWeeks: Int = 40
+    @FocusState private var isNameFocused: Bool
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -28,65 +29,121 @@ struct AddChildSheet: View {
                 AmbientBackground(nightMode: theme.isNightMode)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Name")
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
+                    // Grouped into cards so this reads as the same app as the
+                    // Settings screen that edits the very same fields — the two
+                    // used to share their field code but not their structure, so
+                    // adding a child and editing one looked unrelated.
+                    VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("What do you call your little one?")
+                                    .font(Theme.sproutlyFieldLabel)
+                                    .foregroundStyle(theme.textSecondary)
 
-                            TextField("Child's name", text: $name)
-                                .textFieldStyle(.plain)
-                                .padding(14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(theme.text.opacity(0.04))
+                                TextField(
+                                    "",
+                                    text: $name,
+                                    prompt: Text("Name or nickname")
+                                        .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
                                 )
-                                .foregroundStyle(theme.text)
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Birth Date")
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
-
-                            DatePicker(
-                                "",
-                                selection: $birthDate,
-                                in: ...Date(),
-                                displayedComponents: .date
-                            )
-                            .datePickerStyle(.compact)
-                            .labelsHidden()
-                            .tint(theme.blue)
-                        }
-
-                        Toggle(isOn: $isPremature) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Born Before 37 Weeks")
-                                    .font(Theme.sproutlyCardTitle)
+                                    .textFieldStyle(.plain)
+                                    .font(Theme.sproutlyFieldValue)
                                     .foregroundStyle(theme.text)
-                                Text("Milestones will be gently adjusted")
-                                    .font(Theme.sproutlyBody)
-                                    .foregroundStyle(theme.textSecondary)
+                                    // A name, not a sentence: capitalise it and
+                                    // keep autocorrect away from proper nouns.
+                                    .textInputAutocapitalization(.words)
+                                    .autocorrectionDisabled()
+                                    .submitLabel(.done)
+                                    .focused($isNameFocused)
+                                    .underlineField(
+                                        nightMode: theme.isNightMode,
+                                        isFocused: isNameFocused
+                                    )
+                                    // Without this VoiceOver reads the
+                                    // placeholder — "Child's name" — while the
+                                    // visible label says "Name".
+                                    .accessibilityLabel("Name")
                             }
+
+                            // A labelled row rather than a label above a boxed
+                            // control. The compact DatePicker draws its own pill,
+                            // so wrapping it in `formField` nested one container
+                            // inside another and left a wide dead gap beside it.
+                            // As a row the pill becomes the value on the right,
+                            // which is both the system's own pattern and the same
+                            // shape as the Gestational Age row below.
+                            Theme.divider(nightMode: theme.isNightMode)
+
+                            FormRow(
+                                label: "Birth Date",
+                                systemImage: "calendar",
+                                nightMode: theme.isNightMode
+                            ) {
+                                DatePicker(
+                                    "",
+                                    selection: $birthDate,
+                                    in: ...Date(),
+                                    displayedComponents: .date
+                                )
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
+                                .tint(theme.blueText)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Birth Date")
                         }
-                        .tint(theme.green)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .warmCard(nightMode: theme.isNightMode)
 
-                        if isPremature {
-                            HStack {
-                                Text("Gestational age:")
-                                    .font(Theme.sproutlyBody)
-                                    .foregroundStyle(theme.textSecondary)
-
-                                Picker("", selection: $gestationalWeeks) {
-                                    ForEach(24...40, id: \.self) { week in
-                                        Text("\(week) weeks").tag(week)
-                                    }
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $isPremature) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Did your baby arrive early?")
+                                        .font(Theme.sproutlyCardTitle)
+                                        .foregroundStyle(theme.text)
+                                    Text("Before 37 weeks. We'll take that into account when showing milestones.")
+                                        .font(Theme.sproutlyBody)
+                                        .foregroundStyle(theme.textSecondary)
                                 }
-                                .tint(theme.blue)
                             }
-                            .transition(.opacity)
+                            .toggleStyle(SproutlyToggleStyle(nightMode: theme.isNightMode))
+
+                            if isPremature {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Theme.divider(nightMode: theme.isNightMode)
+
+                                    FormRow(
+                                        label: "Weeks at birth",
+                                        systemImage: "calendar.badge.clock",
+                                        nightMode: theme.isNightMode
+                                    ) {
+                                        Menu {
+                                            Picker("", selection: $gestationalWeeks) {
+                                                ForEach(24...40, id: \.self) { week in
+                                                    Text("\(week) weeks").tag(week)
+                                                }
+                                            }
+                                        } label: {
+                                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                                Text("\(gestationalWeeks) weeks")
+                                                    .font(Theme.sproutlyFieldValue)
+                                                    .foregroundStyle(theme.blueText)
+                                                Image(systemName: "chevron.up.chevron.down")
+                                                    .font(.footnote.weight(.semibold))
+                                                    .foregroundStyle(theme.blueText.opacity(0.7))
+                                            }
+                                            .frame(minHeight: 44)
+                                            .contentShape(Rectangle())
+                                        }
+                                    }
+                                    .accessibilityLabel("Gestational age")
+                                    .accessibilityValue("\(gestationalWeeks) weeks")
+                                }
+                                .transition(.opacity)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .warmCard(nightMode: theme.isNightMode)
                     }
                     .padding(20)
                     .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: isPremature)

@@ -39,7 +39,7 @@ struct DomainConcern: Identifiable {
     let milestoneCount: Int
 
     var summary: String {
-        "\(milestoneCount) skill\(milestoneCount == 1 ? "" : "s") developing"
+        "\(milestoneCount) not saved yet"
     }
 }
 
@@ -81,16 +81,14 @@ struct DevelopmentFocusView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(nightMode ? Theme.nightCard : .white)
+                .fill(Theme.cardBackground(for: nightMode))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(accentColor.opacity(0.2), lineWidth: 1.5)
         )
         .shadow(
-            color: nightMode
-                ? Color.black.opacity(0.25)
-                : Theme.dayText.opacity(0.05),
+            color: Theme.cardShadow(for: nightMode),
             radius: nightMode ? 10 : 16,
             x: 0,
             y: nightMode ? 4 : 6
@@ -116,7 +114,7 @@ struct DevelopmentFocusView: View {
                     .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
 
-                Text("\(totalFlagged) earlier skill\(totalFlagged == 1 ? "" : "s") to revisit")
+                Text("\(totalFlagged) milestone\(totalFlagged == 1 ? "" : "s") from earlier ages")
                     .font(Theme.sproutlyMeta)
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
             }
@@ -171,7 +169,7 @@ struct DevelopmentFocusView: View {
                 .padding(.horizontal, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Theme.textSecondary(for: nightMode).opacity(0.04))
+                        .fill(Theme.recessedFill(for: nightMode))
                 )
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(concern.category.gentleLabel), \(concern.summary)")
@@ -229,7 +227,7 @@ struct DevelopmentFocusView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityHint(showEarlyIntervention ? "Double tap to collapse" : "Double tap to expand")
+        .accessibilityHint(showEarlyIntervention ? "Collapses this section" : "Expands this section")
     }
 
     // MARK: - Early Intervention Panel
@@ -246,7 +244,7 @@ struct DevelopmentFocusView: View {
             )
             interventionPoint(
                 icon: "figure.2.and.child.holdinghands",
-                text: "Early intervention programs focus on building skills through everyday interactions \u{2014} play, feeding, bath time, and shared routines."
+                text: "Early support programs work through everyday interactions \u{2014} play, feeding, bath time, and shared routines."
             )
             interventionPoint(
                 icon: "heart.fill",

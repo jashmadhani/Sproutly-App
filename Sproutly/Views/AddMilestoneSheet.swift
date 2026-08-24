@@ -23,6 +23,7 @@ struct AddMilestoneSheet: View {
     @State private var note: String = ""
     @State private var ageMonth: Int
     @FocusState private var isTitleFocused: Bool
+    @FocusState private var isNoteFocused: Bool
 
     init(child: Child) {
         self.child = child
@@ -50,84 +51,152 @@ struct AddMilestoneSheet: View {
                 AmbientBackground(nightMode: theme.isNightMode)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("What happened?")
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
+                    VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
+                        // What + where: one card, because choosing the area is
+                        // part of describing the moment, not a separate step.
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("What happened?")
+                                    .font(Theme.sproutlyFieldLabel)
+                                    .foregroundStyle(theme.textSecondary)
 
-                            TextField("First swim, said dada…", text: $title)
-                                .textFieldStyle(.plain)
-                                .padding(14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(theme.text.opacity(0.04))
+                                TextField(
+                                    "",
+                                    text: $title,
+                                    prompt: Text("First swim, said dada…")
+                                        .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
                                 )
-                                .foregroundStyle(theme.text)
-                                .focused($isTitleFocused)
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Which area does it belong to?")
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
-
-                            Picker("", selection: $category) {
-                                ForEach(MilestoneCategory.allCases, id: \.self) { option in
-                                    Text(option.gentleLabel).tag(option)
-                                }
+                                    .textFieldStyle(.plain)
+                                    .font(Theme.sproutlyFieldValue)
+                                    .foregroundStyle(theme.text)
+                                    .submitLabel(.done)
+                                    .focused($isTitleFocused)
+                                    .underlineField(
+                                        nightMode: theme.isNightMode,
+                                        isFocused: isTitleFocused
+                                    )
+                                    // The visible label is the question; without
+                                    // this VoiceOver would read the example
+                                    // placeholder instead.
+                                    .accessibilityLabel("What happened?")
                             }
-                            .pickerStyle(.menu)
-                            .tint(theme.blue)
 
-                            Text("This is just for grouping — your own moments never affect how Sproutly reads your child's development.")
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
+                            VStack(alignment: .leading, spacing: 8) {
+
+                                // A Menu with an explicit label rather than a bare
+                                // .menu Picker: the plain picker rendered as a
+                                // small tinted string with nothing around it, so
+                                // the selected domain read as a stray link rather
+                                // than as the value of a field. This matches the
+                                // text field above it.
+                                FormRow(
+                                    label: "Area",
+                                    systemImage: category.icon,
+                                    nightMode: theme.isNightMode
+                                ) {
+                                    Menu {
+                                        Picker("", selection: $category) {
+                                            ForEach(MilestoneCategory.allCases, id: \.self) { option in
+                                                Label(option.gentleLabel, systemImage: option.icon)
+                                                    .tag(option)
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                            Text(category.gentleLabel)
+                                                .font(Theme.sproutlyFieldValue)
+                                                .foregroundStyle(theme.blueText)
+                                                .multilineTextAlignment(.trailing)
+                                            Image(systemName: "chevron.up.chevron.down")
+                                                .font(.footnote.weight(.semibold))
+                                                .foregroundStyle(theme.blueText.opacity(0.7))
+                                        }
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
+                                    }
+                                }
+                                .accessibilityLabel("Area")
+                                .accessibilityValue(category.gentleLabel)
+
+                                // Footnote, not body: this is a section footer,
+                                // one step below the label above it. Three tiers
+                                // — 15 semibold label, 17 value, 13 footer — is
+                                // what gives the card a readable order.
+                                Text("This is just for grouping — your own moments never affect how Sproutly reads your child's development.")
+                                    .font(Theme.sproutlyMeta)
+                                    .foregroundStyle(theme.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .warmCard(nightMode: theme.isNightMode)
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("How old were they?")
-                                .font(Theme.sproutlyMeta)
+                                .font(Theme.sproutlyFieldLabel)
                                 .foregroundStyle(theme.textSecondary)
 
-                            Stepper(value: $ageMonth, in: 0...72) {
+                            HStack(spacing: 12) {
                                 Text(ageMonthText)
-                                    .font(Theme.sproutlyCardTitle)
+                                    .font(Theme.sproutlyFieldValue)
                                     .foregroundStyle(theme.text)
+
+                                Spacer(minLength: 8)
+
+                                SproutlyStepper(
+                                    value: $ageMonth,
+                                    range: 0...72,
+                                    nightMode: theme.isNightMode
+                                ) { _ in ageMonthText }
                             }
-                            .tint(theme.green)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("How old were they?")
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .warmCard(nightMode: theme.isNightMode)
 
-                        Toggle(isOn: $alreadyHappened) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Already happened")
-                                    .font(Theme.sproutlyCardTitle)
-                                    .foregroundStyle(theme.text)
-                                Text("Marks it complete right away")
-                                    .font(Theme.sproutlyMeta)
-                                    .foregroundStyle(theme.textSecondary)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $alreadyHappened) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Already happened")
+                                        .font(Theme.sproutlyCardTitle)
+                                        .foregroundStyle(theme.text)
+                                    Text("Saves it straight away")
+                                        .font(Theme.sproutlyBody)
+                                        .foregroundStyle(theme.textSecondary)
+                                }
                             }
-                        }
-                        .tint(theme.green)
+                            .toggleStyle(SproutlyToggleStyle(nightMode: theme.isNightMode))
 
-                        if alreadyHappened {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("A note, if you'd like")
-                                    .font(Theme.sproutlyMeta)
-                                    .foregroundStyle(theme.textSecondary)
+                            if alreadyHappened {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("A note, if you'd like")
+                                        .font(Theme.sproutlyFieldLabel)
+                                        .foregroundStyle(theme.textSecondary)
 
-                                TextField("Optional", text: $note, axis: .vertical)
-                                    .lineLimit(1...4)
-                                    .textFieldStyle(.plain)
-                                    .padding(14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(theme.text.opacity(0.04))
+                                    TextField(
+                                        "",
+                                        text: $note,
+                                        prompt: Text("Optional")
+                                            .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode)),
+                                        axis: .vertical
                                     )
-                                    .foregroundStyle(theme.text)
+                                        .lineLimit(1...4)
+                                        .textFieldStyle(.plain)
+                                        .font(Theme.sproutlyFieldValue)
+                                        .foregroundStyle(theme.text)
+                                        .focused($isNoteFocused)
+                                        .underlineField(
+                                            nightMode: theme.isNightMode,
+                                            isFocused: isNoteFocused
+                                        )
+                                        .accessibilityLabel("A note, if you'd like")
+                                }
+                                .transition(.opacity)
                             }
-                            .transition(.opacity)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .warmCard(nightMode: theme.isNightMode)
                     }
                     .padding(20)
                     .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: alreadyHappened)

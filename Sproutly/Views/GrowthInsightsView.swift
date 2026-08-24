@@ -16,16 +16,27 @@ struct GrowthInsightsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Section header
-            Label("Growth Insights", systemImage: "lightbulb.fill")
-                .font(Theme.sproutlySectionHeader)
-                .foregroundStyle(Theme.accentBlueText(for: nightMode))
+            // A card title, not a page-section header. This lives *inside* a
+            // card, so its peers are "Report for your visit" and "Night Mode" —
+            // sproutlySectionHeader is the style used by "Growth Domains" and
+            // "Recent Moments", which sit on the page background one level up.
+            // Matching them made this read as oversized for its container, and
+            // as the only card title in the app rendered in blue.
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundStyle(Theme.accentBlueText(for: nightMode))
+
+                Text("Things worth knowing")
+                    .font(Theme.sproutlyCardTitle)
+                    .foregroundStyle(Theme.textPrimary(for: nightMode))
+            }
+            .accessibilityElement(children: .combine)
 
             // Collapsible educational rows
             insightRow(
                 id: "domains",
                 icon: "square.grid.3x3.fill",
-                title: "The Five Domains",
+                title: "Five areas of growth",
                 body: """
                     Child development is often observed across five areas:
 
@@ -35,31 +46,31 @@ struct GrowthInsightsView: View {
                     • Cognitive — Thinking, problem-solving, learning, curiosity
                     • Social-Emotional — Relationships, emotions, behavior, empathy
 
-                    Every child develops across all five areas, but the pace is beautifully unique to each child.
+                    Every child develops across all five, but the pace differs from child to child.
                     """
             )
 
             insightRow(
                 id: "surveillance",
                 icon: "eye.fill",
-                title: "Surveillance vs Screening",
+                title: "What you notice, and what a doctor checks",
                 body: """
-                    Developmental surveillance is the ongoing, gentle observation that happens naturally — noticing what your child can do at each age. This is what Sproutly helps with.
+                    Watching how your child grows day to day — noticing what they can do at each age — is something you already do. That is what Sproutly helps you keep track of.
 
                     Developmental screening uses brief, standardized tools at specific ages (9, 18, and 30 months) to check whether development is on track. Your pediatrician handles these.
 
-                    Both work together to support your child's growth.
+                    The two work together. What you notice at home gives your pediatrician useful context.
                     """
             )
 
             insightRow(
                 id: "early",
                 icon: "heart.fill",
-                title: "Why Early Matters",
+                title: "Why noticing early helps",
                 body: """
                     Research consistently shows that early identification of developmental differences leads to better outcomes. The brain is most adaptable in the earliest years.
 
-                    If a concern is identified, early intervention programs can provide support — and a referral does not require a confirmed diagnosis. These programs focus on building skills through everyday interactions.
+                    If something comes up, early support programs can help — and a referral does not require a diagnosis first. They work through everyday interactions: play, meals, bath time.
 
                     Early support is not about labels. It's about giving every child the best possible start.
                     """
@@ -68,7 +79,7 @@ struct GrowthInsightsView: View {
             insightRow(
                 id: "when",
                 icon: "person.badge.plus",
-                title: "When to Ask",
+                title: "When to ask",
                 body: """
                     Trust your instincts. You know your child best. Some situations where a conversation with your pediatrician can be helpful:
 
@@ -76,7 +87,7 @@ struct GrowthInsightsView: View {
                     • If you notice differences in social engagement, early evaluation can open doors to support
                     • Any time you feel uncertain — pediatricians welcome these questions
 
-                    Well-child visits are the perfect time for these conversations.
+                    Well-child visits are a good time to bring these up.
                     """
             )
         }
@@ -113,7 +124,7 @@ struct GrowthInsightsView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityHint(expandedSection == id ? "Double tap to collapse" : "Double tap to expand")
+            .accessibilityHint(expandedSection == id ? "Collapses this section" : "Expands this section")
 
             if expandedSection == id {
                 Text(body)

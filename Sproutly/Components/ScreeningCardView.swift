@@ -111,13 +111,13 @@ struct ScreeningCheckpoint: Identifiable {
         ScreeningCheckpoint(
             ageMonth: 9,
             title: "9-Month Developmental Check-In",
-            body: "Around this age, the AAP recommends a brief developmental check-in with your pediatrician. These visits help celebrate progress and catch anything early — when support makes the biggest difference.",
+            body: "Around this age the AAP recommends a short developmental check-in with your pediatrician. It is a good moment to go through what you have noticed and raise anything you are unsure about.",
             icon: "clipboard.fill"
         ),
         ScreeningCheckpoint(
             ageMonth: 30,
             title: "30-Month Developmental Check-In",
-            body: "Another developmental check-in helps track your child's beautiful growth. These visits are a wonderful opportunity to discuss any questions and celebrate milestones together with your pediatrician.",
+            body: "Another check-in with your pediatrician. Worth bringing anything you have been wondering about, along with what you have saved since the last visit.",
             icon: "clipboard.fill"
         ),
     ]

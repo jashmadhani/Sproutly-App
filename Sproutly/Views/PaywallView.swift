@@ -288,6 +288,13 @@ enum PaywallReason: Identifiable {
 // MARK: - Links
 
 enum AppLinks {
+    // PLACEHOLDER — must be replaced with the real product domain before the
+    // first submission. App Review opens the privacy link from the paywall and
+    // App Store Connect requires a reachable support URL, so a dead host is a
+    // rejection. These previously pointed at a personal domain carrying the
+    // founder's surname, which is public to every reviewer and customer; the
+    // replacement should be a product domain, not a personal one.
+    //
     // Served as static pages from the Sproutly product site, deliberately
     // separate from the personal portfolio — a parent following this link should
     // land on the app's own site, not on a CV. App Review follows the privacy
@@ -295,8 +302,8 @@ enum AppLinks {
     // must stay reachable for as long as the app is on sale; they are not
     // marketing pages that can be retired. Changing either means a new build,
     // since they are compiled in.
-    static let privacyPolicy = URL(string: "https://sproutly.madhani.in/privacy/")!
-    static let support = URL(string: "https://sproutly.madhani.in/support/")!
+    static let privacyPolicy = URL(string: "https://PLACEHOLDER.example/privacy/")!
+    static let support = URL(string: "https://PLACEHOLDER.example/support/")!
     // Apple's standard EULA, which is the default terms for any app that does
     // not supply its own.
     static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!

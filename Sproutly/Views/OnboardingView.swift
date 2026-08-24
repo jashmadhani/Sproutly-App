@@ -117,19 +117,32 @@ private extension OnboardingView {
     var welcomeStep: some View {
         centeredIntroStep {
             Group {
-                ZStack {
-                    Circle()
-                        .fill(theme.blue.opacity(0.12))
-                        .frame(width: 130, height: 130)
-
-                    Circle()
-                        .fill(theme.blue.opacity(0.08))
-                        .frame(width: 110, height: 110)
-
-                    Image(systemName: "leaf.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(theme.blue)
-                }
+                // The real app mark, not a stand-in glyph: this is the first
+                // screen after install, and the parent tapped this exact icon a
+                // few seconds ago — showing it back is what makes the screen
+                // read as "you're in the right place". Squircle rather than a
+                // circle so the silhouette matches the home screen; a circle
+                // re-crops it and clips the leaves, which reach for the corners.
+                //
+                // AppIconClassicPreview, not AppIcon: .appiconset entries can't
+                // be resolved through Image(_:) at all — the parallel *Preview
+                // imagesets exist for exactly this. Onboarding runs before the
+                // icon picker is reachable, so the default mark is correct here.
+                //
+                // The stroke is load-bearing. The icon's own field is #E9F0E4,
+                // the same value as Theme.dayBg, so with no edge it dissolves
+                // into the page in day mode and reads as loose floating leaves.
+                Image("AppIconClassicPreview")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(theme.text.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: theme.text.opacity(0.10), radius: 12, y: 5)
+                    .accessibilityHidden(true)
 
                 Text("Sproutly")
                     .font(.sproutlyDisplay(40))
@@ -140,7 +153,7 @@ private extension OnboardingView {
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
 
-                    Text("Sproutly helps you notice the quiet,\nbeautiful growth happening every day.")
+                    Text("Keep track of the small things your child does,\nso you can look back on them later.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
@@ -150,10 +163,16 @@ private extension OnboardingView {
         }
     }
 
-    // Step 2: How It Works — Observe → Log → Reflect
+    // Step 2: How It Works — Notice → Save → Look back
     var howItWorksStep: some View {
+        // Deliberately NOT centred like the other intro steps. Three cards plus a
+        // caption is no longer "short content" — centring it left roughly 180pt
+        // of void above the title and 135pt below the caption, which is what
+        // made this step read as empty rather than calm. Top-aligned with a
+        // fixed lead-in, so the whitespace sits in one place instead of two.
         VStack(spacing: 20) {
-            Spacer(minLength: 8)
+            Spacer(minLength: 0)
+                .frame(height: 24)
 
             Text("How Sproutly Works")
                 .font(.sproutlyDisplay(28))
@@ -162,31 +181,31 @@ private extension OnboardingView {
             VStack(spacing: 12) {
                 howItWorksRow(
                     icon: "eye",
-                    title: "Observe",
-                    subtitle: "Notice the little things your child does each day"
+                    title: "Notice",
+                    subtitle: "The small things your child does each day"
                 )
 
                 howItWorksRow(
                     icon: "square.and.pencil",
-                    title: "Log",
-                    subtitle: "Tap once to record a milestone — it takes a second"
+                    title: "Save",
+                    subtitle: "One tap saves it. That's the whole thing."
                 )
 
                 howItWorksRow(
                     icon: "heart.text.square",
-                    title: "Reflect",
-                    subtitle: "Look back on your journey with warmth"
+                    title: "Look back",
+                    subtitle: "See how much has changed since last month."
                 )
             }
             .padding(.horizontal, 24)
 
-            Text("That's it. Simple, gentle, yours.")
+            Text("Notice it. Save it. Come back to it.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 24)
         }
         .padding()
     }
@@ -210,7 +229,7 @@ private extension OnboardingView {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.text)
 
-                Text("Every child blooms in their own time.\nSproutly is here to support you,\nnot to score or compare.")
+                Text("Every child gets there in their own time.\nSproutly is here to help you keep track,\nnot to score or compare.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.textSecondary)
@@ -280,63 +299,74 @@ private extension OnboardingView {
                         .foregroundStyle(theme.text)
                 }
 
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        fieldLabel("Child's Name", systemImage: "heart.fill")
+                VStack(alignment: .leading, spacing: 4) {
+                    // Typed text gets a rule; the date, the toggle and the weeks
+                    // picker are rows. Each of those three already draws its own
+                    // control, so a container of ours around them only ever
+                    // produced a box inside a box.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("What do you call your little one?")
+                            .font(Theme.sproutlyFieldLabel)
+                            .foregroundStyle(theme.textSecondary)
 
-
-                        TextField("Enter name", text: $childName)
-                            .focused($isNameFieldFocused)
-                            .textFieldStyle(.plain)
-                            .padding(16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(theme.text.opacity(0.05))
-                            )
-                            .foregroundStyle(theme.text)
-                            .textInputAutocapitalization(.words)
-                            .autocorrectionDisabled()
-                            .onTapGesture {
-                                isNameFieldFocused = true
-                            }
+                        TextField(
+                            "",
+                            text: $childName,
+                            prompt: Text("Name or nickname")
+                                .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
+                        )
+                        .focused($isNameFieldFocused)
+                        .textFieldStyle(.plain)
+                        .font(Theme.sproutlyFieldValue)
+                        .foregroundStyle(theme.text)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .underlineField(
+                            nightMode: theme.isNightMode,
+                            isFocused: isNameFieldFocused
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture { isNameFieldFocused = true }
                     }
+                    .padding(.bottom, 8)
 
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        fieldLabel("Birth Date", systemImage: "calendar")
-
+                    FormRow(label: "Birth Date", systemImage: "calendar", nightMode: theme.isNightMode) {
                         DatePicker("", selection: $birthDate, displayedComponents: .date)
                             .datePickerStyle(.compact)
                             .labelsHidden()
-                            .tint(theme.blue)
+                            .tint(theme.blueText)
                     }
 
+                    Theme.divider(nightMode: theme.isNightMode)
 
                     Toggle(isOn: $isPremature) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Born Before 37 Weeks")
-                                .font(Theme.sproutlyCardTitle)
+                            Text("Did your baby arrive early?")
+                                .font(Theme.sproutlyFieldValue)
                                 .foregroundStyle(theme.text)
-                            Text("We'll adjust milestones gently")
+                            Text("Before 37 weeks. We'll take that into account when showing milestones.")
                                 .font(Theme.sproutlyBody)
                                 .foregroundStyle(theme.textSecondary)
                         }
                     }
-                    .tint(theme.green)
+                    .toggleStyle(SproutlyToggleStyle(nightMode: theme.isNightMode))
+                    .padding(.vertical, 10)
 
                     if isPremature {
-                        VStack(alignment: .leading, spacing: 8) {
-                            fieldLabel("Gestational Age at Birth", systemImage: "calendar.badge.clock")
+                        Theme.divider(nightMode: theme.isNightMode)
 
-                            Picker("Weeks", selection: $gestationalWeeks) {
+                        FormRow(
+                            label: "Weeks at birth",
+                            systemImage: "calendar.badge.clock",
+                            nightMode: theme.isNightMode
+                        ) {
+                            Picker("", selection: $gestationalWeeks) {
                                 ForEach(24...40, id: \.self) { week in
                                     Text("\(week) weeks").tag(week)
                                 }
                             }
-#if os(iOS)
-                            .pickerStyle(.wheel)
-#endif
-                            .frame(height: 100)
+                            .labelsHidden()
+                            .tint(theme.blueText)
                         }
                     }
                 }
@@ -398,8 +428,8 @@ private extension OnboardingView {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(theme.isNightMode ? Theme.nightCard : .white)
-                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+                .fill(theme.card)
+                .shadow(color: theme.cardShadow, radius: 8, x: 0, y: 2)
         )
     }
 }

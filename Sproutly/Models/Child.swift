@@ -91,7 +91,7 @@ final class Child {
         let weeks = max(0, remainingDays / 7)
 
         if months == 0 && weeks == 0 {
-            return "Just beginning this journey"
+            return "Just arrived"
         } else if months >= 12 {
             let years = months / 12
             let rem = months % 12

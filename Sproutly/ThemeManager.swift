@@ -20,6 +20,23 @@ final class ThemeManager {
         }
     }
     
+    // MARK: - Accessibility State
+    //
+    // Increase Contrast and Reduce Transparency are environment values, not
+    // stored settings, so they can only be read from inside a view. They are
+    // mirrored here — synced once from the root in `ContentView` — so that
+    // every screen keeps reading plain `theme.card` / `theme.progressTrack`
+    // and gets the right value, instead of each view separately reading the
+    // environment and making its own colour decision. Deliberately *not*
+    // persisted: these follow the system, and a stale copy in UserDefaults
+    // would survive the reader turning the setting back off.
+
+    /// Mirrors `\.colorSchemeContrast == .increased`.
+    var increaseContrast: Bool = false
+
+    /// Mirrors `\.accessibilityReduceTransparency`.
+    var reduceTransparency: Bool = false
+
     init() {
         self.isNightMode = UserDefaults.standard.bool(forKey: "nightModeEnabled")
     }
@@ -43,6 +60,29 @@ final class ThemeManager {
     var proGoldGradient: LinearGradient { Theme.proGoldGradient(for: isNightMode) }
     var proHaloGradient: RadialGradient { Theme.proHaloGradient(for: isNightMode) }
     var yellow: Color { Theme.encourageYellow(for: isNightMode) }
+
+    // MARK: - Surface Ladder
+
+    /// LEVEL 4 — the floating tab dock.
+    var navigationSurface: Color {
+        Theme.navigationSurface(for: isNightMode, reduceTransparency: reduceTransparency)
+    }
+    var navigationEdge: Color {
+        Theme.navigationEdge(for: isNightMode, increaseContrast: increaseContrast)
+    }
+    var navigationShadow: Color { Theme.navigationShadow(for: isNightMode) }
+    var cardShadow: Color { Theme.cardShadow(for: isNightMode) }
+
+    /// Unfilled portion of a progress bar.
+    var progressTrack: Color {
+        Theme.progressTrack(for: isNightMode, increaseContrast: increaseContrast)
+    }
+    var recessedFill: Color {
+        Theme.recessedFill(for: isNightMode, increaseContrast: increaseContrast)
+    }
+    var divider: Color {
+        Theme.dividerColor(for: isNightMode, increaseContrast: increaseContrast)
+    }
     
     // domain colors
     var grossMotorColor: Color { Theme.grossMotorColor(for: isNightMode) }
@@ -50,6 +90,14 @@ final class ThemeManager {
     var languageColor: Color { Theme.languageColor(for: isNightMode) }
     var cognitiveColor: Color { Theme.cognitiveColor(for: isNightMode) }
     var socialEmotionalColor: Color { Theme.socialEmotionalColor(for: isNightMode) }
+
+    // domain tile surfaces (LEVEL 2) — see Theme's "Domain Tile Surfaces" note
+    // for why these are solved values rather than the accents at an opacity.
+    var grossMotorTile: Color { Theme.grossMotorTile(for: isNightMode) }
+    var fineMotorTile: Color { Theme.fineMotorTile(for: isNightMode) }
+    var languageTile: Color { Theme.languageTile(for: isNightMode) }
+    var cognitiveTile: Color { Theme.cognitiveTile(for: isNightMode) }
+    var socialEmotionalTile: Color { Theme.socialEmotionalTile(for: isNightMode) }
     
     // MARK: - Color Scheme Override
     

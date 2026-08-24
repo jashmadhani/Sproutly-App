@@ -123,7 +123,20 @@ enum MilestoneCategory: String, CaseIterable {
         case .socialEmotional: return Theme.socialEmotionalColor(for: nightMode)
         }
     }
-    
+
+    /// The tile surface for this domain, as an opaque colour. `color(for:)`
+    /// above is the *accent* — the icon and the filled part of the progress bar
+    /// — and is far too saturated to sit behind text.
+    func tileBackground(for nightMode: Bool) -> Color {
+        switch self {
+        case .grossMotor: return Theme.grossMotorTile(for: nightMode)
+        case .fineMotor: return Theme.fineMotorTile(for: nightMode)
+        case .language: return Theme.languageTile(for: nightMode)
+        case .cognitive: return Theme.cognitiveTile(for: nightMode)
+        case .socialEmotional: return Theme.socialEmotionalTile(for: nightMode)
+        }
+    }
+
     var gentleLabel: String {
         switch self {
         case .grossMotor: return "Movement & Strength"

@@ -13,7 +13,7 @@ import Observation
 @Observable
 final class PurchaseManager {
 
-    static let productID = "com.jashmadhani.Sproutly.pro"
+    static let productID = "com.PLACEHOLDER.sproutly.pro"
 
     enum PurchaseState: Equatable {
         case idle

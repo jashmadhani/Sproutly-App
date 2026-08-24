@@ -17,6 +17,9 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Reveals the per-row remove buttons. Resets on every appearance — an
+    /// editing mode a parent left on last week should not be waiting for them.
+    @State private var isEditingChildren = false
     
     @State private var showResetAlert = false
     @State private var showDeleteAlert = false
@@ -43,6 +46,7 @@ struct SettingsView: View {
     }
 
     @State private var activeSheet: SettingsSheet?
+    @FocusState private var isProfileNameFocused: Bool
     @State private var showRemoveChildAlert = false
     @State private var childToDelete: Child?
     @State private var scrollOffset: CGFloat = 0
@@ -60,12 +64,7 @@ struct SettingsView: View {
                     childrenSection
                     profileSection
                     prematuritySection
-                    if purchases.isPro {
-                        proFeaturesSection
-                    }
-                    appIconSection
-                    aboutSection
-                    legalSection
+                    moreSection
                     dataSection
                 }
                 .padding(.horizontal, 20)
@@ -200,9 +199,7 @@ struct SettingsView: View {
             
             Spacer()
             
-            Toggle("", isOn: $tm.isNightMode)
-                .labelsHidden()
-                .tint(theme.blue)
+            SproutlySwitch(isOn: $tm.isNightMode, nightMode: theme.isNightMode)
                 .accessibilityLabel("Night Mode")
                 .accessibilityHint("Reduce brightness for quiet evenings")
         }
@@ -216,13 +213,53 @@ struct SettingsView: View {
     // a parent with one child sees just "Add a child".
     private var childrenSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            fieldLabel("Children", systemImage: "figure.2.and.child.holdinghands")
+            HStack {
+                fieldLabel("Children", systemImage: "figure.2.and.child.holdinghands")
+
+                Spacer()
+
+                // Removing a child deletes every milestone they own. A red
+                // button sitting permanently on every row put that one mistap
+                // away, on a screen a parent opens for ordinary reasons, in an
+                // app whose stated requirement is calm and never alarming.
+                //
+                // Not `.swipeActions` — that only does anything inside a `List`,
+                // and this roster is a VStack in a card, so it would have
+                // silently removed the only way to delete a child. Edit mode is
+                // the pattern iOS uses outside lists and stays discoverable.
+                if childStore.hasMultipleChildren {
+                    Button(isEditingChildren ? "Done" : "Edit") {
+                        withAnimation(Theme.spring(0.3, reduceMotion: reduceMotion)) {
+                            isEditingChildren.toggle()
+                        }
+                    }
+                    .font(.subheadline.weight(isEditingChildren ? .semibold : .regular))
+                    .foregroundStyle(theme.blueText)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                    .accessibilityLabel(isEditingChildren ? "Done editing children" : "Edit children")
+                }
+            }
 
             if childStore.hasMultipleChildren {
                 ForEach(childStore.children) { entry in
                     let isActive = entry.id == childStore.activeChild?.id
 
                     HStack(spacing: 12) {
+                        if isEditingChildren {
+                            Button {
+                                childToDelete = entry
+                                showRemoveChildAlert = true
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red.opacity(0.8))
+                                    .frame(width: 28, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove \(entry.displayName)")
+                            .transition(.opacity.combined(with: .move(edge: .leading)))
+                        }
+
                         Button {
                             childStore.select(entry)
                         } label: {
@@ -240,27 +277,34 @@ struct SettingsView: View {
 
                                 Spacer()
 
+                                // "Showing" rather than a bare tick. A green
+                                // check sitting immediately beside a red minus
+                                // put a state indicator and a destructive action
+                                // in one column, where the tick reads as a second
+                                // button — a word cannot be mistaken for one.
                                 if isActive {
-                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Showing")
+                                        .font(.caption2.weight(.semibold))
                                         .foregroundStyle(theme.greenText)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            Capsule().fill(theme.green.opacity(0.16))
+                                        )
                                 }
                             }
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(entry.displayName), \(entry.ageText)")
                         .accessibilityHint(isActive ? "Currently showing" : "Switch to this child")
-
-                        Button {
-                            childToDelete = entry
-                            showRemoveChildAlert = true
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .foregroundStyle(.red.opacity(0.6))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(entry.displayName)")
                     }
                     .padding(.vertical, 4)
+                    // Reachable without entering Edit mode, so a VoiceOver user
+                    // never has to find a mode to remove a child.
+                    .accessibilityAction(named: "Remove \(entry.displayName)") {
+                        childToDelete = entry
+                        showRemoveChildAlert = true
+                    }
                 }
             }
 
@@ -277,8 +321,15 @@ struct SettingsView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "plus.circle.fill")
+                    // Bare `plus`, matching the "Add moment" button on
+                    // Milestones. These mean the same thing — create something —
+                    // and were the only pair in the app using two different
+                    // glyphs for one intent; the filled circle also sat heavier
+                    // than anything around it.
+                    Image(systemName: "plus")
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(theme.blueText)
+                        .frame(width: 22)
                     Text("Add a child")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
@@ -300,38 +351,48 @@ struct SettingsView: View {
             fieldLabel(child.displayName, systemImage: "heart.fill")
             
             // Name
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Name")
-                    .font(Theme.sproutlyMeta)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What do you call your little one?")
+                    .font(Theme.sproutlyFieldLabel)
                     .foregroundStyle(theme.textSecondary)
                 
-                TextField("Child's name", text: $profile.name)
+                TextField(
+                    "",
+                    text: $profile.name,
+                    prompt: Text("Name or nickname")
+                        .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
+                )
                     .textFieldStyle(.plain)
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(theme.text.opacity(0.04))
-                    )
+                    .font(Theme.sproutlyFieldValue)
                     .foregroundStyle(theme.text)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($isProfileNameFocused)
+                    .underlineField(
+                        nightMode: theme.isNightMode,
+                        isFocused: isProfileNameFocused
+                    )
+                    .accessibilityLabel("Name")
                     .onChange(of: child.name) { _, _ in
                         childStore.save()
                     }
             }
             
-            // Birth date
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Birth Date")
-                    .font(Theme.sproutlyMeta)
-                    .foregroundStyle(theme.textSecondary)
-                
+            // Birth date — the same labelled row as AddChildSheet. These two
+            // screens edit the identical fields, so they should not present them
+            // two different ways.
+            FormRow(label: "Birth Date", systemImage: "calendar", nightMode: theme.isNightMode) {
                 DatePicker("", selection: $profile.birthDate, displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .labelsHidden()
-                    .tint(theme.blue)
+                    .tint(theme.blueText)
                     .onChange(of: child.birthDate) { _, _ in
                         childStore.save()
                     }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Birth Date")
         }
         .warmCard(nightMode: theme.isNightMode)
     }
@@ -342,39 +403,46 @@ struct SettingsView: View {
         @Bindable var profile = child
         
         return VStack(alignment: .leading, spacing: 16) {
-            fieldLabel("Adjusted Age", systemImage: "sparkles")
+            fieldLabel("Adjusted for arriving early", systemImage: "sparkles")
             
             Toggle(isOn: $profile.isPremature) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Born Before 37 Weeks")
+                    Text("Did your baby arrive early?")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
-                    Text("Milestones will be gently adjusted")
+                    Text("Before 37 weeks. We'll take that into account when showing milestones.")
                         .font(Theme.sproutlyBody)
                         .foregroundStyle(theme.textSecondary)
                 }
             }
-            .tint(theme.green)
-            .accessibilityLabel("Born Before 37 Weeks")
+            .toggleStyle(SproutlyToggleStyle(nightMode: theme.isNightMode))
+            .accessibilityLabel("Arrived early")
             .accessibilityHint("Adjusts milestones for premature birth")
             .onChange(of: child.isPremature) { _, _ in
                 childStore.save()
             }
             
             if child.isPremature {
-                HStack {
-                    Text("Gestational age:")
-                        .font(Theme.sproutlyBody)
-                        .foregroundStyle(theme.textSecondary)
-                    
-                    Picker("", selection: $profile.gestationalWeeks) {
-                        ForEach(24...40, id: \.self) { week in
-                            Text("\(week) weeks").tag(week)
+                VStack(spacing: 0) {
+                    Theme.divider(nightMode: theme.isNightMode)
+
+                    FormRow(
+                        label: "Weeks at birth",
+                        systemImage: "calendar.badge.clock",
+                        nightMode: theme.isNightMode
+                    ) {
+                        Picker("", selection: $profile.gestationalWeeks) {
+                            ForEach(24...40, id: \.self) { week in
+                                Text("\(week) weeks").tag(week)
+                            }
                         }
-                    }
-                    .tint(theme.blue)
-                    .onChange(of: child.gestationalWeeks) { _, _ in
-                        childStore.save()
+                        .labelsHidden()
+                        // blueText, not blue: `blue` is a surface tint that
+                        // fails contrast as text on both day backgrounds.
+                        .tint(theme.blueText)
+                        .onChange(of: child.gestationalWeeks) { _, _ in
+                            childStore.save()
+                        }
                     }
                 }
                 .transition(.opacity)
@@ -384,174 +452,199 @@ struct SettingsView: View {
         .animation(Theme.spring(0.4, reduceMotion: reduceMotion), value: child.isPremature)
     }
     
-    // MARK: - Pro Features
+    // MARK: - Grouped Rows
+    //
+    // These seven rows used to be seven separate floating cards, each 28pt from
+    // its neighbour. That cost roughly 280pt of dead space on this screen — a
+    // third of an iPhone's height — and, worse, gave rows that plainly belong
+    // together ("Privacy Policy" and "Support", "Reset" and "Delete") no visual
+    // relationship at all. They are now two grouped cards with hairline
+    // separators, which is the shape the system's own grouped list uses.
 
-    // Only shown once Pro is owned — the durable answer to "what did I buy
-    // and where do I use it," reachable any time without hunting.
-    private var proFeaturesSection: some View {
-        Button {
-            activeSheet = .proFeatures
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(theme.proGold)
-                Text("Pro Features")
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.text)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.textSecondary.opacity(0.6))
-            }
+    private func settingsRow<Trailing: View>(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        titleColor: Color,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
+                .frame(width: 22)
+
+            Text(title)
+                .font(Theme.sproutlyCardTitle)
+                .foregroundStyle(titleColor)
+
+            Spacer(minLength: 8)
+
+            trailing()
         }
-        .buttonStyle(.plain)
-        .warmCard(nightMode: theme.isNightMode)
+        .padding(.horizontal, Theme.cardPadding)
+        // Comfortably past the 44pt minimum, and the row's whole width is the
+        // tap target rather than just the label.
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
     }
 
-    // MARK: - App Icon
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(theme.textSecondary.opacity(0.6))
+    }
 
-    // Reach-triggered like every other gate: a free parent taps this and gets
-    // the paywall naming the feature, rather than a disabled row.
-    private var appIconSection: some View {
-        Button {
-            Task { @MainActor in
-                activeSheet = await purchases.isUnlocked() ? .appIcon : .paywall(.appIcon)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "app.badge")
-                    .foregroundStyle(theme.textSecondary)
-                Text("App Icon")
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.text)
-                Spacer()
-                if !purchases.isPro {
-                    Text("Pro")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(theme.proGold)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(theme.proGold.opacity(0.14))
-                        )
+    // Leaves the app, so it gets the system's outward arrow rather than the
+    // chevron the in-app sheets use.
+    private var externalArrow: some View {
+        Image(systemName: "arrow.up.right")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(theme.textSecondary.opacity(0.6))
+    }
+
+    private var rowDivider: some View {
+        Theme.divider(nightMode: theme.isNightMode)
+            .padding(.leading, Theme.cardPadding + 22 + 12)
+    }
+
+    // MARK: - More
+
+    // Pro Features only appears once Pro is owned — the durable answer to "what
+    // did I buy and where do I use it," reachable any time without hunting.
+    //
+    // Privacy Policy and Support also live on the paywall, but that screen is
+    // reach-triggered and dismisses itself the moment `isPro` flips, so a parent
+    // who has already bought Pro would otherwise have no way to open the privacy
+    // policy from inside the app at all. Guideline 5.1.1(i) wants it reachable
+    // in-app, not only in App Store Connect.
+    private var moreSection: some View {
+        VStack(spacing: 0) {
+            if purchases.isPro {
+                Button {
+                    activeSheet = .proFeatures
+                } label: {
+                    settingsRow(
+                        icon: "star.fill",
+                        iconColor: theme.proGold,
+                        title: "Pro Features",
+                        titleColor: theme.text
+                    ) { chevron }
                 }
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+                .buttonStyle(.plain)
+
+                rowDivider
             }
-        }
-        .buttonStyle(.plain)
-        .warmCard(nightMode: theme.isNightMode)
-    }
 
-    // MARK: - About
-
-    private var aboutSection: some View {
-        Button {
-            activeSheet = .aboutData
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(theme.textSecondary)
-                Text("About the Data")
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.text)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+            // Reach-triggered like every other gate: a free parent taps this and
+            // gets the paywall naming the feature, rather than a disabled row.
+            Button {
+                Task { @MainActor in
+                    activeSheet = await purchases.isUnlocked() ? .appIcon : .paywall(.appIcon)
+                }
+            } label: {
+                settingsRow(
+                    icon: "app.badge",
+                    iconColor: theme.textSecondary,
+                    title: "App Icon",
+                    titleColor: theme.text
+                ) {
+                    HStack(spacing: 8) {
+                        if !purchases.isPro {
+                            Text("Pro")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(theme.proGold)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(theme.proGold.opacity(0.14)))
+                        }
+                        chevron
+                    }
+                }
             }
-        }
-        .buttonStyle(.plain)
-        .warmCard(nightMode: theme.isNightMode)
-    }
+            .buttonStyle(.plain)
 
-    // MARK: - Legal
+            rowDivider
 
-    // Both links also live on the paywall, but that screen is reach-triggered and
-    // dismisses itself the moment `isPro` flips — so a parent who has already
-    // bought Pro, or who never happens to tap a gated feature, would have no way
-    // to open the privacy policy from inside the app at all. Guideline 5.1.1(i)
-    // wants it reachable in-app, not only in App Store Connect, so it needs a
-    // home on a screen that is always available.
-    private var legalSection: some View {
-        VStack(spacing: Theme.sectionSpacing) {
-            legalRow(
-                title: "Privacy Policy",
-                icon: "hand.raised",
-                destination: AppLinks.privacyPolicy
-            )
-            legalRow(
-                title: "Support",
-                icon: "questionmark.circle",
-                destination: AppLinks.support
-            )
-        }
-    }
-
-    private func legalRow(title: String, icon: String, destination: URL) -> some View {
-        Link(destination: destination) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundStyle(theme.textSecondary)
-                Text(title)
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.text)
-                Spacer()
-                // Leaves the app, so it gets the system's outward arrow rather
-                // than the chevron the in-app sheets use.
-                Image(systemName: "arrow.up.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.textSecondary.opacity(0.6))
+            Button {
+                activeSheet = .aboutData
+            } label: {
+                settingsRow(
+                    icon: "info.circle",
+                    iconColor: theme.textSecondary,
+                    title: "About the Data",
+                    titleColor: theme.text
+                ) { chevron }
             }
+            .buttonStyle(.plain)
+
+            rowDivider
+
+            Link(destination: AppLinks.privacyPolicy) {
+                settingsRow(
+                    icon: "hand.raised",
+                    iconColor: theme.textSecondary,
+                    title: "Privacy Policy",
+                    titleColor: theme.text
+                ) { externalArrow }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Privacy Policy")
+            .accessibilityHint("Opens in Safari")
+
+            rowDivider
+
+            Link(destination: AppLinks.support) {
+                settingsRow(
+                    icon: "questionmark.circle",
+                    iconColor: theme.textSecondary,
+                    title: "Support",
+                    titleColor: theme.text
+                ) { externalArrow }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Support")
+            .accessibilityHint("Opens in Safari")
         }
-        .buttonStyle(.plain)
-        .warmCard(nightMode: theme.isNightMode)
-        .accessibilityLabel(title)
-        .accessibilityHint("Opens in Safari")
+        .groupedCard(nightMode: theme.isNightMode)
     }
-    
+
     // MARK: - Data Management
-    
+
     private var dataSection: some View {
-        // Reset and Delete are each their own full-width card, same visual
-        // weight as every other card on this screen — they were the one
-        // place still using itemSpacing, which is what made the gap here
-        // read as tighter than everywhere else.
-        VStack(spacing: Theme.sectionSpacing) {
+        VStack(spacing: 0) {
             Button {
                 showResetAlert = true
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .foregroundStyle(theme.textSecondary)
-                    Text("Reset Milestone Progress")
-                        .font(Theme.sproutlyCardTitle)
-                        .foregroundStyle(theme.text)
-                    Spacer()
-                }
+                settingsRow(
+                    icon: "arrow.counterclockwise",
+                    iconColor: theme.textSecondary,
+                    title: "Reset Milestone Progress",
+                    titleColor: theme.text
+                ) { EmptyView() }
             }
-            .warmCard(nightMode: theme.isNightMode)
+            .buttonStyle(.plain)
             .accessibilityLabel("Reset Milestone Progress")
-            .accessibilityHint("Unmarks all milestones, keeps profile")
-            
+            .accessibilityHint("Clears everything saved for this child, keeps their profile")
+
+            rowDivider
+
             Button {
                 showDeleteAlert = true
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red.opacity(0.7))
-                    Text("Delete All Data")
-                        .font(Theme.sproutlyCardTitle)
-                        .foregroundStyle(.red.opacity(0.7))
-                    Spacer()
-                }
+                settingsRow(
+                    icon: "trash",
+                    iconColor: .red.opacity(0.7),
+                    title: "Delete All Data",
+                    titleColor: .red.opacity(0.7)
+                ) { EmptyView() }
             }
-            .warmCard(nightMode: theme.isNightMode)
+            .buttonStyle(.plain)
             .accessibilityLabel("Delete All Data")
             .accessibilityHint("Removes all data and returns to welcome screen")
         }
+        .groupedCard(nightMode: theme.isNightMode)
     }
+
     
     // MARK: - Actions
     

@@ -63,3 +63,369 @@ Building/testing is done in Xcode (⌘R / ⌘U); a single test runs from the dia
 - `INFOPLIST_KEY_NSPhotoLibraryUsageDescription` lives in `project.yml` and is required — a missing usage string is a launch-time crash and a review rejection.
 - Category is **Lifestyle**, not Health & Fitness: copy stays educational and never diagnoses. Onboarding carries a required medical disclaimer step.
 - Tone is a hard product requirement — reassuring, non-alarming, never a scorecard. The paywall follows the same rule: no urgency language, no launch nag.
+
+## UX writing and Sproutly voice
+
+Tone and language are a hard product requirement.
+
+Sproutly is a parent-oriented lifestyle and child-development companion. Its language should feel like it was written by someone who understands what parents actually notice, wonder about, and want to remember.
+
+The UI should feel:
+- calm
+- human
+- reassuring
+- practical
+- thoughtful
+- parent-first
+- clear
+- conversational
+
+It should NOT feel:
+- AI-generated
+- corporate
+- like startup marketing copy
+- overly sentimental
+- overly cute
+- academic
+- clinical
+- like a healthcare dashboard
+
+### Core writing principle
+
+Write for a parent, not for a product specification.
+
+The ideal reaction to a sentence is:
+
+"That's exactly what I was thinking."
+
+Not:
+
+"That's a polished sentence."
+
+Prefer concrete, natural language over emotional or inspirational language.
+
+For example:
+
+BAD:
+"Look back on your journey with warmth."
+
+BETTER:
+"See how much your child has changed over time."
+
+BAD:
+"Milestones will be gently adjusted."
+
+BETTER:
+"We'll take that into account when showing milestones."
+
+BAD:
+"That's it. Simple, gentle, yours."
+
+BETTER:
+"Notice it. Save it. Come back to it."
+
+BAD:
+"Child's Name"
+
+BETTER:
+"What do you call your little one?"
+
+BAD:
+"Recent Moments"
+
+BETTER:
+"What you've noticed"
+
+These are examples of the writing direction, not mandatory replacements.
+
+### Avoid AI-sounding language
+
+Do not repeatedly use words or phrases such as:
+
+- gentle
+- journey
+- beautiful
+- meaningful moments
+- little moments
+- bloom
+- celebrate
+- with warmth
+- beautifully unique
+- quiet growth
+- gentle discovery
+- precious moments
+- magical
+- wonderful journey
+
+These words are not forbidden individually. Avoid repetitive or artificial emotional language.
+
+Do not add emotional language merely to make a sentence sound warm.
+
+The existing visual design already communicates warmth. The copy should provide clarity and personality.
+
+### Parent-first vocabulary
+
+Prefer language based on what parents actually do:
+
+- notice
+- see
+- save
+- remember
+- look back
+- learn
+- explore
+- try
+- play
+- grow
+- discover
+- keep track
+
+Use "noticed" or "saved" where appropriate instead of unnecessarily formal product terminology.
+
+Milestones should feel like things a parent notices, not tests a child passes.
+
+Avoid language that makes parents feel as though they are being graded.
+
+### Child-development language
+
+Child-development terminology may be used when necessary for accuracy, but user-facing copy should prefer ordinary parent-friendly explanations.
+
+Do not unnecessarily make the application sound clinical or academic.
+
+For example:
+
+Prefer:
+
+"Five ways children grow"
+
+over:
+
+"The Five Developmental Domains"
+
+Prefer:
+
+"Keeping an eye on how your child is growing"
+
+over:
+
+"Developmental Surveillance"
+
+Prefer:
+
+"What you've noticed"
+
+over:
+
+"Developmental Observations"
+
+when the underlying functionality supports that wording.
+
+Do not invent terminology merely to make the product sound sophisticated.
+
+### Do not alter meaning to improve tone
+
+Do not change factual meaning, calculations, milestone logic, corrected-age logic, or safety-related behavior merely to make copy sound friendlier.
+
+If existing terminology is required because it describes an actual product behavior, retain the underlying meaning and find the clearest parent-facing explanation.
+
+If you encounter language that appears unnecessarily clinical, flag it and propose a parent-friendly alternative.
+
+### Onboarding
+
+Onboarding should feel like a calm introduction from a product that understands parents.
+
+Avoid startup-style positioning.
+
+Avoid inspirational slogans.
+
+The parent should quickly understand:
+
+- what Sproutly does
+- why it is useful
+- how it works
+- why information is being requested
+
+Use natural language.
+
+For example:
+
+Instead of:
+
+"Observe → Log → Reflect"
+
+consider language based on the actual experience:
+
+"Notice → Save → Look back"
+
+Do not change the interaction model solely because of this wording preference.
+
+### Dashboard
+
+The dashboard should feel like a personal snapshot of the child's development.
+
+It should not feel like an analytics dashboard.
+
+Prefer:
+
+"What you've noticed"
+
+over:
+
+"Recent Observations"
+
+Prefer:
+
+"Things worth knowing"
+
+over:
+
+"Growth Insights"
+
+Prefer:
+
+"Five ways children grow"
+
+over:
+
+"The Five Domains"
+
+when the surrounding content supports it.
+
+### Milestones
+
+Milestones are observations, not grades.
+
+Avoid language implying that a child has:
+- passed
+- failed
+- achieved a score
+- fallen behind
+- completed an assessment
+
+unless the underlying feature genuinely requires that terminology.
+
+When a parent records a milestone, the interaction should feel like:
+
+"I noticed my child doing this."
+
+rather than:
+
+"I checked another item off a checklist."
+
+### Memory and notes
+
+Memory-related interactions should feel personal but not sentimental.
+
+Prefer:
+
+"Save this moment"
+
+"Add a note"
+
+"What did you notice?"
+
+"Anything you want to remember?"
+
+over exaggerated emotional language.
+
+### Educational content
+
+Educational sections should sound like a knowledgeable parenting guide.
+
+Use:
+- short paragraphs
+- concrete examples
+- everyday language
+- clear explanations
+
+Avoid:
+- textbook-style introductions
+- unnecessary jargon
+- academic phrasing
+- generic research-summary language
+- dramatic claims
+
+### Settings
+
+Settings should explain features in terms parents understand.
+
+For example:
+
+Instead of:
+"Milestones will be gently adjusted."
+
+Prefer:
+"We'll take that into account when showing milestones."
+
+Do not use "gentle" as a substitute for explaining what a feature actually does.
+
+### Accessibility
+
+Apply the same writing principles to:
+
+- accessibilityLabel
+- accessibilityHint
+- accessibilityValue
+- VoiceOver text
+
+Accessibility copy must remain concise and functional.
+
+Do not make accessibility descriptions artificially conversational.
+
+### Product-specific terminology
+
+Maintain consistency across the application.
+
+Before changing terminology, search the entire repository and determine where the term is used.
+
+Do not perform blind global replacements.
+
+For important concepts, choose one primary term and use it consistently.
+
+Examples that require deliberate decisions:
+
+- child vs little one
+- milestone vs skill
+- noticed vs completed
+- growth vs development
+- moment vs memory
+- note vs memory
+
+Context may justify exceptions.
+
+### Code comments
+
+Developer comments are separate from user-facing copy.
+
+Do not rewrite comments simply to make them sound more human.
+
+Only change comments when they:
+- are incorrect
+- describe behavior that has changed
+- are unnecessarily verbose
+- contain misleading information
+- document a non-obvious implementation decision incorrectly
+
+Keep developer comments concise and technical.
+
+### UX writing audit workflow
+
+When asked to improve Sproutly's copy:
+
+1. Scan the entire repository.
+2. Find all user-facing strings.
+3. Find accessibility strings.
+4. Find relevant developer comments.
+5. Group copy by feature.
+6. Identify repetitive, generic, AI-sounding, overly clinical, or overly sentimental language.
+7. Establish consistent terminology.
+8. Propose major changes before making them.
+9. Implement the changes.
+10. Search again for the old terminology.
+11. Build the project.
+12. Check for clipping, truncation, broken interpolation, and layout problems caused by changed copy.
+13. Report all changed files and major terminology decisions.
+
+Never blindly replace strings.
+
+Always understand where a string appears before changing it.

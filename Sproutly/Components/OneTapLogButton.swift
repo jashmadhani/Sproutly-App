@@ -52,12 +52,15 @@ struct OneTapLogButton: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        // Mirrors the visible mental model: the parent saves what they notice,
+        // rather than marking items complete on a checklist. VoiceOver already
+        // announces the double-tap mechanic, so the hint describes the result.
         .accessibilityLabel(
             accessibilityTitle.isEmpty
-                ? (isCompleted ? "Completed" : "Mark as complete")
-                : (isCompleted ? "Unmark \(accessibilityTitle) as complete" : "Mark \(accessibilityTitle) as complete")
+                ? (isCompleted ? "Saved" : "Save")
+                : (isCompleted ? "Saved: \(accessibilityTitle)" : "Save: \(accessibilityTitle)")
         )
-        .accessibilityHint(isCompleted ? "Double tap to unmark" : "Double tap to mark complete")
+        .accessibilityHint(isCompleted ? "Removes it from what you've saved" : "Saves it to what you've noticed")
         .accessibilityAddTraits(.isButton)
     }
 }
