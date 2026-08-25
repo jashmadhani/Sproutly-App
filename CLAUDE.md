@@ -53,7 +53,31 @@ Building/testing is done in Xcode (⌘R / ⌘U); a single test runs from the dia
 
 **Assistant is rule-based, not an LLM.** `Views/AssistantView.swift` is the tab screen (header + scroll chrome); `Views/SupportAssistantView.swift` holds the actual logic — a keyword→category→weight table plus one hand-written response per `MilestoneCategory`. Never introduce a network call here.
 
-**Theming.** `Theme.swift` exposes only `static func x(for nightMode: Bool) -> Color` — no adaptive asset colors. `ThemeManager` (`@Observable`, `UserDefaults` key `nightModeEnabled`) resolves them and drives `.preferredColorScheme`. Views use `@Environment(ThemeManager.self)` with `theme.card`, `.warmCard(nightMode:)`, `AmbientBackground`. Don't hardcode a `Color` in a view.
+**Theming.** `Theme.swift` exposes only `static func x(for nightMode: Bool) -> Color` — no adaptive asset colors. `ThemeManager` (`@Observable`, `UserDefaults` key `nightModeEnabled`) resolves them and drives `.preferredColorScheme`. Views use `@Environment(ThemeManager.self)`. **Never hardcode a `Color`, an opacity, or a shadow in a view** — if a surface needs a value that doesn't exist, add a named role to `Theme` rather than an inline `.opacity()`.
+
+**The surface ladder.** Every surface is separated from what it sits on by *luminance first*, with shadow and shape as reinforcement only. LEVEL 0 background (`dayBg` sage / `nightBg`) → LEVEL 1 card (`dayCard` warm ivory / `nightCard`) → LEVEL 2 tinted domain tile → LEVEL 4 floating dock (`dayNav`, the **only** pure white in day mode). LEVEL 3 doesn't occur.
+
+Two rules that are easy to break:
+
+- **Pure white means "the dock" and nothing else.** A second pure-white surface anywhere breaks the one step the ladder depends on. Raised things use `theme.card`.
+- **Opacity over a tint is not a surface.** `accent.opacity(x)` composites in sRGB while the eye reads relative luminance, so one alpha over five hues gives five different weights. That bug shipped twice — once in the domain tiles (1.115–1.194 against the background instead of one value) and again in their progress tracks (1.06:1 on teal, invisible). Both are now solved opaque values: `grossMotorTile(for:)` etc., and the track is the *card* colour, a channel cut through the tile. Any new tinted surface must be solved per hue, not shared-alpha'd.
+
+Roles, all on both `Theme` and `ThemeManager`: `background` `card` `navigationSurface` `navigationEdge` `navigationShadow` `cardShadow` `recessedFill` `progressTrack` `divider`/`dividerColor` `fieldRule` `fieldPlaceholder` `toggleOffTrack` `textPrimary` `textSecondary` `accentBlue`/`accentBlueText` `growthGreen(Text)` `encourageYellow(Text)` `proGold`.
+
+**Surface tints vs text weights.** `accentBlue`, `growthGreen`, `encourageYellow` and the five domain colours are *surface* colours — they fail AA as text. Anything a parent reads uses the `…Text` variant. Note the day text accents are solved against **`#D6E3D8`**, the darkest point `AmbientBackground`'s blurred circles produce — not against the flat `dayBg` token, which is lighter and gave a false pass.
+
+**Accessibility state.** `colorSchemeContrast` and `accessibilityReduceTransparency` are read once at the root (`ContentView.syncAccessibilityState`) and mirrored onto `ThemeManager.increaseContrast` / `.reduceTransparency`, so screens keep reading plain `theme.progressTrack` and get the right value. Don't read those environment values per-view. Modifiers that need contrast without a `ThemeManager` (`UnderlineField`, `DividerLine`, `SproutlySwitch`, `SproutlyStepper`) read `\.colorSchemeContrast` themselves.
+
+**Form vocabulary.** Typed text gets a rule; everything else is a row.
+
+- `.underlineField(nightMode:isFocused:)` — **only** for something the parent types. No fill, a rule beneath, accent at 2pt when focused.
+- `FormRow(label:systemImage:nightMode:) { value }` — dates, menus, pickers. Reflows label-over-value at accessibility sizes.
+- `SproutlySwitch` / `SproutlyToggleStyle`, `SproutlyStepper` — UIKit draws these on a `#C3C2C1` neutral track that `.tint()` can't reach, which is the single most "imported from another app" thing on screen. Use ours. `SproutlySwitch` exists separately for rows that already lay themselves out; the style's internal `Spacer` fights a row's own.
+- Always pass `prompt: Text(…).foregroundColor(Theme.fieldPlaceholder(for:))`. The **system placeholder is ~1.67:1 and cannot be fixed by changing the fill** — it's translucent grey compositing over whatever is behind it, so it measures ~1.7 at every fill alpha including pure white.
+
+**Never wrap a system control in a container of ours.** `DatePicker`, `Menu` and `Stepper` each draw their own pill; adding our box put one box inside another (measured 1.15:1 — two near-identical greys). They become a `FormRow`'s value instead.
+
+**One line weight.** `fieldRule` resting *is* `dividerColor` — the same function every row separator calls. It briefly had its own heavier value and a field underline at twice the weight of every other rule read as a line cutting the card in half.
 
 **Category strings.** `Milestone.category` is a `String` bridged via `categoryType`. Values must exactly match `MilestoneCategory` raw values (`"Gross Motor"`, `"Fine Motor"`, `"Language"`, `"Cognitive"`, `"Social-Emotional"`) — a typo silently falls back to `.grossMotor`.
 
@@ -62,6 +86,8 @@ Building/testing is done in Xcode (⌘R / ⌘U); a single test runs from the dia
 - App Privacy must stay **Data Not Collected**. `Resources/PrivacyInfo.xcprivacy` declares no tracking, no collected data types, one accessed-API reason (`CA92.1`, `UserDefaults`). Anything that adds an API requiring a reason, or moves data off-device, invalidates both this and the privacy policy.
 - `INFOPLIST_KEY_NSPhotoLibraryUsageDescription` lives in `project.yml` and is required — a missing usage string is a launch-time crash and a review rejection.
 - Category is **Lifestyle**, not Health & Fitness: copy stays educational and never diagnoses. Onboarding carries a required medical disclaimer step.
+- **The app identity is a placeholder.** `com.PLACEHOLDER.sproutly`, `com.PLACEHOLDER.sproutly.pro`, and `https://PLACEHOLDER.example/…` stand in for a company reverse-DNS and product domain that don't exist yet. A bundle ID is permanent once an App Store Connect app record exists, and an IAP product ID is permanent once that product exists — **so no App Store Connect record may be created until these are final.** All six occurrences change together: `bundleIdPrefix` and both `PRODUCT_BUNDLE_IDENTIFIER`s in `project.yml`, `productID` in `Sproutly.storekit`, `PurchaseManager.productID`, the assertion in `PurchaseManagerTests`, and `AppLinks` in `PaywallView.swift`. The URLs previously carried the founder's surname; the replacements must be a product domain, not a personal one.
+- **Payments are Apple IAP only.** Guideline 3.1.1 requires IAP for unlocking in-app features, so Stripe/Razorpay/PayPal are rejections, not options. Apple is merchant of record. `.storekit` is simulator-only fiction — a matching IAP record must exist in App Store Connect or `Product.products(for:)` returns empty on device and the paywall silently shows nothing.
 - Tone is a hard product requirement — reassuring, non-alarming, never a scorecard. The paywall follows the same rule: no urgency language, no launch nag.
 
 ## UX writing and Sproutly voice
@@ -429,3 +455,17 @@ When asked to improve Sproutly's copy:
 Never blindly replace strings.
 
 Always understand where a string appears before changing it.
+
+## Verifying a change on the simulator
+
+Xcode is the user's build path, but visual claims should be checked against a real render rather than asserted. Booted device: `6E7776E5-2832-40EE-89DC-4198DE84F3A8`.
+
+- **Measure, don't eyeball.** Screenshot with `simctl io <dev> screenshot`, then sample pixels and compute WCAG ratios in Python. Every contrast number in this file came from a render, and several "fixes" that looked right by eye measured wrong — the tile tracks, the placeholder, the segmented control.
+- **Sampling is easy to get wrong.** A `min by luminance` over a band will happily return antialiased *text* instead of the rule you meant to measure. Confirm the pixel you sampled is the thing you think it is before reporting a number.
+- **Night mode** can't be toggled by writing the plist while the app or simulator is live — cfprefsd caches it and the app rewrites it on launch. Full `shutdown` → `PlistBuddy` on the container's `Library/Preferences/…plist` → `boot` → launch.
+- `simctl ui <dev> increase_contrast enabled|disabled` and `simctl ui <dev> content_size accessibility-large` both work live and are the only way to check those paths.
+- **There is no tap automation** — assistive access is denied on this machine, and no MCP gesture tools are exposed. To reach a tab or sheet, temporarily edit `MainTabView.selectedTab` / the sheet's `@State` default, build, screenshot, then **restore from a backup copy** and verify the revert.
+
+## Open decisions
+
+- **`ScreeningCheckpoint` is factually inconsistent.** `allCheckpoints` (`ScreeningCardView.swift`) holds only 9- and 30-month entries, while `GrowthInsightsView` tells parents screening happens at "9, 18, and 30 months". Verified, deliberately not fixed — adding an 18-month checkpoint changes what the app tells parents about their child's health, so it needs a product decision, not a code fix. Don't invent the missing checkpoint.
