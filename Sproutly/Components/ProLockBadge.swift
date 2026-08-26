@@ -24,7 +24,7 @@ struct ProLockBadge: View {
     var body: some View {
         Image(systemName: "lock.fill")
             .font(Theme.sproutlyMeta.weight(.semibold))
-            .foregroundStyle(theme.proGold)
+            .foregroundStyle(theme.proGoldText)
             // The row or button around it already says what the feature is;
             // this only has to say that it's locked.
             .accessibilityLabel("Sproutly Pro")

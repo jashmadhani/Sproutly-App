@@ -57,6 +57,9 @@ final class ThemeManager {
     var ctaGradient: LinearGradient { Theme.ctaGradient(for: isNightMode) }
     var ctaShadow: Color { Theme.ctaShadow(for: isNightMode) }
     var proGold: Color { Theme.proGold(for: isNightMode) }
+    /// Use for any gold a parent has to actually see — locks, stars, labels.
+    /// `proGold` is a surface and fails AA as a mark. See Theme.proGoldText.
+    var proGoldText: Color { Theme.proGoldText(for: isNightMode) }
     var proGoldGradient: LinearGradient { Theme.proGoldGradient(for: isNightMode) }
     var proHaloGradient: RadialGradient { Theme.proHaloGradient(for: isNightMode) }
     var yellow: Color { Theme.encourageYellow(for: isNightMode) }

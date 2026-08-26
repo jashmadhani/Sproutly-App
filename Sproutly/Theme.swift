@@ -333,6 +333,15 @@ enum Theme {
         return textPrimary(for: nightMode).opacity(nightMode ? 0.08 : 0.06)
     }
 
+    /// The soft disc behind a card's leading glyph.
+    ///
+    /// Named rather than inlined because it appears on every Settings feature
+    /// card and on the onboarding hero icons, and those had drifted to three
+    /// different alphas of the same blue.
+    static func iconHalo(for nightMode: Bool) -> Color {
+        accentBlue(for: nightMode).opacity(nightMode ? 0.18 : 0.12)
+    }
+
     /// The rule under a typed field.
     ///
     /// Fields used to be boxes: a tinted fill plus a 1px border. Measured on
@@ -493,6 +502,27 @@ enum Theme {
 
     static func proGold(for nightMode: Bool) -> Color {
         nightMode ? proGoldNight : proGoldDay
+    }
+
+    /// Gold that survives being read, rather than being a surface.
+    ///
+    /// Same split as `accentBlue` / `accentBlueText`, and for the same reason:
+    /// measured on a render, the day bronze `#B8935A` is **2.76:1 on the card
+    /// and 2.15:1 on the background** — below even the 3:1 WCAG asks of a
+    /// meaningful non-text glyph, let alone the 4.5:1 for text. Every lock
+    /// badge and Pro star was drawn in it.
+    ///
+    /// `#7C5E24` is the first step down the ramp that clears AA on both: 5.83:1
+    /// on the card, 4.55:1 against `#D6E3D8` (the darkest point the ambient
+    /// background produces). The night gold already measures 5.80:1 on
+    /// `nightCard`, so it is unchanged.
+    ///
+    /// `proGold` itself stays for fills and gradients, where it is a surface
+    /// and the contrast rule does not apply.
+    static let proGoldTextDay = Color(hex: 0x7C5E24)
+
+    static func proGoldText(for nightMode: Bool) -> Color {
+        nightMode ? proGoldNight : proGoldTextDay
     }
 
     static func proGoldGradient(for nightMode: Bool) -> LinearGradient {
@@ -864,6 +894,83 @@ struct FormRow<Value: View>: View {
         .frame(minHeight: 52)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+}
+
+/// The header of a Settings feature card: circled glyph, title, one
+/// explanatory line, and a trailing control.
+///
+/// Extracted because Night Mode and Gentle reminders were hand-rolling the same
+/// HStack, and it carried two accessibility faults at large text sizes:
+///
+/// - **The circle now scales with the glyph.** The icon used
+///   `sproutlyScaledFont` while the disc behind it was pinned at 40pt, so at
+///   accessibility sizes the glyph grew straight out of the ornament it was
+///   meant to sit in. `@ScaledMetric` grows them together.
+/// - **The row now reflows.** Icon, text and control could not share a line at
+///   those sizes; the text column got narrow enough to hyphenate mid-word
+///   ("Reduce bright-ness for quiet evenings"). Same `AnyLayout` switch
+///   `FormRow` already uses.
+struct SettingsFeatureHeader<Control: View>: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let nightMode: Bool
+    @ViewBuilder let control: () -> Control
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var circleSize: CGFloat = 40
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                // Everything stacks. The glyph gets its own line rather than
+                // sharing one with the title: at these sizes the scaled disc is
+                // wide enough that the remaining text column hyphenated
+                // mid-word ("Reduce bright-ness"). Full width, no hyphens.
+                VStack(alignment: .leading, spacing: 12) {
+                    glyph
+                    labels
+                    control()
+                }
+            } else {
+                HStack(spacing: 14) {
+                    glyph
+                    labels
+                    Spacer(minLength: 8)
+                    control()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var glyph: some View {
+        ZStack {
+            Circle()
+                .fill(Theme.iconHalo(for: nightMode))
+                .frame(width: circleSize, height: circleSize)
+
+            Image(systemName: systemImage)
+                .sproutlyScaledFont(18, relativeTo: .body)
+                .foregroundStyle(Theme.accentBlueText(for: nightMode))
+        }
+        // Decorative: the title beside it already says what this is.
+        .accessibilityHidden(true)
+    }
+
+    private var labels: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(Theme.sproutlyCardTitle)
+                .foregroundStyle(Theme.textPrimary(for: nightMode))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(subtitle)
+                .font(Theme.sproutlyBody)
+                .foregroundStyle(Theme.textSecondary(for: nightMode))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

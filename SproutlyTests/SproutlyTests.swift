@@ -2096,6 +2096,39 @@ final class UIRegressionTests: XCTestCase {
         }
     }
 
+    // Measured on a render: the day bronze is 2.76:1 on the card and 2.15:1 on
+    // the background — below even the 3:1 WCAG asks of a meaningful glyph. Any
+    // gold a parent has to *see* must use the text variant.
+    func testGoldMarksUseTheTextSafeVariant() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            // Theme owns the definitions; the gradient is a surface.
+            if url.lastPathComponent == "Theme.swift"
+                || url.lastPathComponent == "ThemeManager.swift" { continue }
+            let text = try String(contentsOf: url, encoding: .utf8)
+
+            for (index, line) in text.components(separatedBy: .newlines).enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("///") else { continue }
+                guard line.contains("foregroundStyle") || line.contains("iconColor:")
+                    || line.contains("tint:") else { continue }
+                // `proGoldText` legitimately contains "proGold" as a prefix.
+                let usesSurfaceGold = line.contains("proGold")
+                    && !line.contains("proGoldText")
+                    && !line.contains("proGoldGradient")
+                XCTAssertFalse(
+                    usesSurfaceGold,
+                    "\(url.lastPathComponent):\(index + 1) draws a gold mark in the surface tint"
+                )
+            }
+        }
+    }
+
     // Settings listed every Pro feature inline *and* opened a paywall that
     // lists the same features, one tap apart.
     func testSettingsDoesNotDuplicateThePaywallsFeatureList() throws {

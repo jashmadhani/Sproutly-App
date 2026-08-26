@@ -182,29 +182,12 @@ struct SettingsView: View {
     private var nightModeCard: some View {
         @Bindable var tm = theme
         
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(theme.blue.opacity(0.12))
-                    .frame(width: 40, height: 40)
-                
-                Image(systemName: theme.isNightMode ? "moon.stars.fill" : "moon.fill")
-                    .sproutlyScaledFont(18, relativeTo: .body)
-                    .foregroundStyle(theme.blueText)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Night Mode")
-                    .font(Theme.sproutlyCardTitle)
-                    .foregroundStyle(theme.text)
-
-                Text("Reduce brightness for quiet evenings")
-                    .font(Theme.sproutlyBody)
-                    .foregroundStyle(theme.textSecondary)
-            }
-            
-            Spacer()
-            
+        return SettingsFeatureHeader(
+            title: "Night Mode",
+            subtitle: "Reduce brightness for quiet evenings",
+            systemImage: theme.isNightMode ? "moon.stars.fill" : "moon.fill",
+            nightMode: theme.isNightMode
+        ) {
             SproutlySwitch(isOn: $tm.isNightMode, nightMode: theme.isNightMode)
                 .accessibilityLabel("Night Mode")
                 .accessibilityHint("Reduce brightness for quiet evenings")
@@ -232,7 +215,7 @@ struct SettingsView: View {
         // apart. The list stays (that is the point of C.2: judge the offer
         // without being sold to) and there is now one way through.
         VStack(alignment: .leading, spacing: 16) {
-            fieldLabel("Sproutly Pro", systemImage: "star.fill", tint: theme.proGold)
+            fieldLabel("Sproutly Pro", systemImage: "star.fill", tint: theme.proGoldText)
 
             Text("One payment, yours forever.")
                 .font(Theme.sproutlyBody)
@@ -284,30 +267,12 @@ struct SettingsView: View {
             // of thing: one feature, on or off, with a sentence saying what it
             // does. The previous version invented a fourth card idiom for this
             // screen, with its own padding and four shrinking type sizes.
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(theme.blue.opacity(0.12))
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: "bell.fill")
-                        .sproutlyScaledFont(18, relativeTo: .body)
-                        .foregroundStyle(theme.blueText)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Gentle reminders")
-                        .font(Theme.sproutlyCardTitle)
-                        .foregroundStyle(theme.text)
-
-                    Text("At most one a day, in the morning")
-                        .font(Theme.sproutlyBody)
-                        .foregroundStyle(theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 8)
-
+            SettingsFeatureHeader(
+                title: "Gentle reminders",
+                subtitle: "At most one a day, in the morning",
+                systemImage: "bell.fill",
+                nightMode: theme.isNightMode
+            ) {
                 SproutlySwitch(
                     isOn: Binding(
                         get: { notifications.settings.masterEnabled },
@@ -708,7 +673,7 @@ struct SettingsView: View {
                 } label: {
                     settingsRow(
                         icon: "star.fill",
-                        iconColor: theme.proGold,
+                        iconColor: theme.proGoldText,
                         title: "Pro Features",
                         titleColor: theme.text
                     ) { chevron }
