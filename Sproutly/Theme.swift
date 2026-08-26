@@ -312,6 +312,27 @@ enum Theme {
         return textPrimary(for: nightMode).opacity(alpha)
     }
 
+    /// The fill behind a single milestone row.
+    ///
+    /// A row sits inside a card that has already paid its own padding, so this
+    /// is the second surface in one level of hierarchy — it exists to make rows
+    /// read as separate items, not to raise them. Completed rows carry the green
+    /// instead, which is what makes a saved row legible at a glance without a
+    /// second control.
+    ///
+    /// Named rather than inlined so the onboarding backfill list and the
+    /// Milestones tab cannot drift apart: they are the same row, and a second
+    /// copy of these alphas is how they would stop being the same row.
+    static func milestoneRowFill(
+        for nightMode: Bool,
+        isCompleted: Bool = false
+    ) -> Color {
+        if isCompleted {
+            return growthGreen(for: nightMode).opacity(nightMode ? 0.14 : 0.10)
+        }
+        return textPrimary(for: nightMode).opacity(nightMode ? 0.08 : 0.06)
+    }
+
     /// The rule under a typed field.
     ///
     /// Fields used to be boxes: a tinted fill plus a 1px border. Measured on

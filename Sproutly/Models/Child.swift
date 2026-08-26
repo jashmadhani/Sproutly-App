@@ -73,10 +73,30 @@ final class Child {
 
     // accounts for prematurity using 4.33 weeks/month
     func calculateCorrectedAge() -> Int {
-        guard isPremature else { return chronologicalAgeMonths }
+        Self.correctedAgeMonths(
+            birthDate: birthDate,
+            isPremature: isPremature,
+            gestationalWeeks: gestationalWeeks
+        )
+    }
+
+    // The same rule, reachable without a Child. Onboarding builds its backfill
+    // list from the profile fields before the child has been created, and this
+    // must stay the single implementation — a second copy of the correction is
+    // exactly the kind of drift that would show one age on screen and score
+    // against another.
+    static func correctedAgeMonths(
+        birthDate: Date,
+        isPremature: Bool,
+        gestationalWeeks: Int,
+        now: Date = Date()
+    ) -> Int {
+        let elapsed = Calendar.current.dateComponents([.month], from: birthDate, to: now).month ?? 0
+        let chronological = max(0, elapsed)
+        guard isPremature else { return chronological }
         let missingWeeks = 40 - gestationalWeeks
         let missingMonths = Int(round(Double(missingWeeks) / 4.33))
-        return max(0, chronologicalAgeMonths - missingMonths)
+        return max(0, chronological - missingMonths)
     }
 
     var isCorrectedAge: Bool {

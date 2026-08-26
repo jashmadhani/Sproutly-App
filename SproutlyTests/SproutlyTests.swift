@@ -441,6 +441,318 @@ final class ReportTests: XCTestCase {
     }
 }
 
+// MARK: - Onboarding Backfill
+
+@MainActor
+final class BackfillTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        return container.mainContext
+    }
+
+    private func makeChild(
+        in context: ModelContext,
+        name: String,
+        ageMonths: Int,
+        isPremature: Bool = false,
+        gestationalWeeks: Int = 40
+    ) -> Child {
+        let birth = Calendar.current.date(byAdding: .month, value: -ageMonths, to: Date())!
+        let child = Child(
+            name: name,
+            birthDate: birth,
+            isPremature: isPremature,
+            gestationalWeeks: gestationalWeeks
+        )
+        context.insert(child)
+        DataSeeder.seed(for: child, in: context)
+        return child
+    }
+
+    // MARK: Offering
+
+    // The seed catalog starts at six months, so there is nothing to offer a
+    // newborn and the step must not appear at all. This is the case that makes
+    // the skip a list check rather than an age check.
+    func testNothingIsOfferedBelowTheFirstMilestoneBracket() {
+        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 0).isEmpty)
+        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 4).isEmpty)
+        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 5).isEmpty)
+        XCTAssertFalse(BackfillCatalog.candidates(correctedAge: 6).isEmpty)
+    }
+
+    func testOnlyMilestonesAtOrBelowCorrectedAgeAreOffered() {
+        let candidates = BackfillCatalog.candidates(correctedAge: 12)
+
+        XCTAssertFalse(candidates.isEmpty)
+        XCTAssertTrue(candidates.allSatisfy { $0.ageMonth <= 12 })
+        XCTAssertEqual(Set(candidates.map(\.ageMonth)), [6, 9, 12])
+    }
+
+    // A premature child must be offered against corrected age, not chronological.
+    // Twelve months chronological at 30 weeks corrects to ten, which lands either
+    // side of the twelve-month bracket — so the two ages give different lists and
+    // the test can actually tell them apart.
+    func testPrematureChildIsOfferedByCorrectedAgeNotChronological() throws {
+        let context = try makeContext()
+        let child = makeChild(
+            in: context,
+            name: "Ravi",
+            ageMonths: 12,
+            isPremature: true,
+            gestationalWeeks: 30
+        )
+
+        XCTAssertEqual(child.chronologicalAgeMonths, 12)
+        XCTAssertEqual(child.calculateCorrectedAge(), 10)
+
+        let corrected = BackfillCatalog.candidates(correctedAge: child.calculateCorrectedAge())
+        let chronological = BackfillCatalog.candidates(correctedAge: child.chronologicalAgeMonths)
+
+        XCTAssertEqual(Set(corrected.map(\.ageMonth)), [6, 9])
+        XCTAssertEqual(Set(chronological.map(\.ageMonth)), [6, 9, 12])
+        XCTAssertLessThan(corrected.count, chronological.count)
+    }
+
+    // Parent-authored moments have no expected age and are inert everywhere that
+    // judges progress. They must never be offered here either.
+    func testUserCreatedMilestonesAreNeverOffered() throws {
+        let context = try makeContext()
+        let child = makeChild(in: context, name: "Aanya", ageMonths: 24)
+
+        let ownMoment = Milestone(
+            title: "First swim",
+            category: MilestoneCategory.socialEmotional.rawValue,
+            ageMonth: 24,
+            tips: "",
+            child: child,
+            isUserCreated: true
+        )
+        context.insert(ownMoment)
+        try context.save()
+
+        let offered = Set(BackfillCatalog.candidates(correctedAge: 24).map(\.title))
+        XCTAssertFalse(offered.contains("First swim"))
+
+        // And even if a parent authored a moment whose title collides with a
+        // catalog entry, applying must leave their moment alone.
+        let collidingTitle = try XCTUnwrap(BackfillCatalog.candidates(correctedAge: 24).first).title
+        let collision = Milestone(
+            title: collidingTitle,
+            category: MilestoneCategory.cognitive.rawValue,
+            ageMonth: 24,
+            child: child,
+            isUserCreated: true
+        )
+        context.insert(collision)
+        try context.save()
+
+        BackfillCatalog.apply([collidingTitle], to: child)
+
+        XCTAssertFalse(collision.isCompleted)
+        let seeded = child.milestones.first { $0.title == collidingTitle && !$0.isUserCreated }
+        XCTAssertEqual(seeded?.isCompleted, true)
+    }
+
+    // MARK: Applying
+
+    func testBackfillMarksOnlyTheSelectedMilestonesAndLeavesSiblingsAlone() throws {
+        let context = try makeContext()
+        let aanya = makeChild(in: context, name: "Aanya", ageMonths: 14)
+        let ravi = makeChild(in: context, name: "Ravi", ageMonths: 14)
+
+        let selected = Set(BackfillCatalog.candidates(correctedAge: 14).prefix(3).map(\.title))
+        XCTAssertEqual(selected.count, 3)
+
+        BackfillCatalog.apply(selected, to: aanya)
+        try context.save()
+
+        let completed = aanya.milestones.filter(\.isCompleted)
+        XCTAssertEqual(Set(completed.map(\.title)), selected)
+
+        // Backfilled means "it happened, we don't know when".
+        XCTAssertTrue(completed.allSatisfy { $0.dateCompleted == nil })
+        XCTAssertTrue(completed.allSatisfy { $0.completionNote.isEmpty })
+
+        // The sibling shares nothing.
+        XCTAssertTrue(ravi.milestones.allSatisfy { !$0.isCompleted })
+    }
+
+    // "Skip for now" must be genuinely free: nothing marked, onboarding over.
+    func testSkippingLeavesEverythingIncompleteAndStillEndsOnboarding() throws {
+        let context = try makeContext()
+        let store = ChildStore(context: context)
+        XCTAssertTrue(store.needsOnboarding)
+
+        let child = store.addChild(name: "Aanya", birthDate: Calendar.current.date(
+            byAdding: .month, value: -14, to: Date()
+        )!)
+        BackfillCatalog.apply([], to: child)
+        store.save()
+
+        XCTAssertFalse(store.needsOnboarding)
+        XCTAssertEqual(store.activeChild?.id, child.id)
+        XCTAssertFalse(child.milestones.isEmpty)
+        XCTAssertTrue(child.milestones.allSatisfy { !$0.isCompleted })
+    }
+
+    // MARK: Scoring
+
+    // A bulk backfill has to move the domain scores, or the dashboard the parent
+    // lands on still reads as though they had noticed nothing.
+    func testDomainScoringReflectsABulkBackfill() throws {
+        let context = try makeContext()
+        let child = makeChild(in: context, name: "Aanya", ageMonths: 12)
+
+        let grossMotorTitles = Set(
+            BackfillCatalog.candidates(correctedAge: 12)
+                .filter { $0.category == .grossMotor }
+                .map(\.title)
+        )
+        XCTAssertFalse(grossMotorTitles.isEmpty)
+
+        BackfillCatalog.apply(grossMotorTitles, to: child)
+        try context.save()
+
+        let observations = DevelopmentObserver.observe(
+            milestones: child.sortedMilestones,
+            correctedAge: 12
+        )
+
+        let grossMotor = try XCTUnwrap(observations.first { $0.category == .grossMotor })
+        XCTAssertEqual(grossMotor.ratio, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(grossMotor.status, .onTrack)
+
+        // An untouched domain must not have moved.
+        let language = try XCTUnwrap(observations.first { $0.category == .language })
+        XCTAssertEqual(language.ratio, 0.0, accuracy: 0.0001)
+    }
+
+    // The dashboard recomputes behind a hash signature rather than reactively, so
+    // a backfill that changed no *count* the view model watches would leave the
+    // ring stale. Completion is part of the signature — this pins that.
+    func testDashboardRecomputesAfterABackfill() throws {
+        let context = try makeContext()
+        let child = makeChild(in: context, name: "Aanya", ageMonths: 12)
+        let viewModel = DashboardViewModel()
+
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+        XCTAssertTrue(viewModel.completedMilestones.isEmpty)
+
+        let titles = Set(BackfillCatalog.candidates(correctedAge: 12).prefix(5).map(\.title))
+        BackfillCatalog.apply(titles, to: child)
+        try context.save()
+
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+        XCTAssertEqual(Set(viewModel.completedMilestones.map(\.title)), titles)
+    }
+
+    // MARK: Ordering
+
+    // Backfilled milestones carry no date. Sorting them as `.distantPast` sank
+    // them below everything; sorting them as "now" would bury a moment the parent
+    // saved five minutes ago. They go after the dated ones, in a fixed order.
+    func testUndatedCompletionsSortAfterDatedOnesDeterministically() {
+        let older = Milestone(
+            title: "Rolls over", category: "Gross Motor", ageMonth: 6,
+            isCompleted: true, dateCompleted: Date(timeIntervalSince1970: 1_000)
+        )
+        let newer = Milestone(
+            title: "Waves bye", category: "Social-Emotional", ageMonth: 9,
+            isCompleted: true, dateCompleted: Date(timeIntervalSince1970: 2_000)
+        )
+        let backfilledEarly = Milestone(
+            title: "Sits up", category: "Gross Motor", ageMonth: 6, isCompleted: true
+        )
+        let backfilledLate = Milestone(
+            title: "Walks", category: "Gross Motor", ageMonth: 12, isCompleted: true
+        )
+
+        let ordered = Milestone.recencyOrdered(
+            [backfilledEarly, older, backfilledLate, newer]
+        )
+
+        XCTAssertEqual(
+            ordered.map(\.title),
+            ["Waves bye", "Rolls over", "Walks", "Sits up"]
+        )
+
+        // Deterministic: `sorted(by:)` is not stable, so a differently shuffled
+        // input must still produce the same order.
+        let reshuffled = Milestone.recencyOrdered(
+            [newer, backfilledLate, backfilledEarly, older]
+        )
+        XCTAssertEqual(ordered.map(\.title), reshuffled.map(\.title))
+    }
+
+    // MARK: Sharing
+
+    // The share card is the one artifact designed to leave the phone, and it used
+    // to fall back to `Date()` — printing today as the day a backfilled milestone
+    // happened, which was simply false.
+    func testShareCardNeverInventsADateForABackfilledMilestone() {
+        let dated = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let withDate = MilestoneShareCard.caption(childName: "Aanya", dateCompleted: dated)
+        XCTAssertTrue(withDate.hasPrefix("Aanya · "))
+        XCTAssertTrue(withDate.contains(dated.formatted(date: .long, time: .omitted)))
+
+        let withoutDate = MilestoneShareCard.caption(childName: "Aanya", dateCompleted: nil)
+        XCTAssertEqual(withoutDate, "Aanya")
+        XCTAssertFalse(
+            withoutDate.contains(Date().formatted(date: .long, time: .omitted))
+        )
+    }
+
+    // And it still renders — an undated caption must not break the layout.
+    func testShareCardRendersForABackfilledMilestone() throws {
+        let context = try makeContext()
+        let child = makeChild(in: context, name: "Aanya", ageMonths: 14)
+
+        let title = try XCTUnwrap(BackfillCatalog.candidates(correctedAge: 14).first).title
+        BackfillCatalog.apply([title], to: child)
+        try context.save()
+
+        let milestone = try XCTUnwrap(
+            child.milestones.first { $0.title == title && !$0.isUserCreated }
+        )
+        XCTAssertNil(milestone.dateCompleted)
+
+        let url = try XCTUnwrap(
+            ShareRenderer.card(for: milestone, childName: "Aanya", nightMode: false)
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+
+        let data = try Data(contentsOf: url)
+        XCTAssertNotNil(UIImage(data: data))
+    }
+
+    // The pediatrician report filters on isCompleted alone, so backfilled items
+    // appear in it. They must appear without a fabricated date rather than not
+    // appear at all — the clinician is reading what the parent has observed.
+    func testReportListsBackfilledMilestonesWithoutADate() throws {
+        let context = try makeContext()
+        let child = makeChild(in: context, name: "Aanya", ageMonths: 12)
+
+        let titles = Set(BackfillCatalog.candidates(correctedAge: 12).prefix(4).map(\.title))
+        BackfillCatalog.apply(titles, to: child)
+        try context.save()
+
+        let report = ReportBuilder.build(for: child)
+        let completed = report.sections.flatMap(\.completed)
+
+        XCTAssertEqual(Set(completed.map(\.title)), titles)
+        XCTAssertTrue(completed.allSatisfy { $0.dateCompleted == nil })
+    }
+}
+
 // MARK: - Purchases
 
 @MainActor
