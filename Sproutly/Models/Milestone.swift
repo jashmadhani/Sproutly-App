@@ -208,3 +208,37 @@ extension Milestone {
         !isUserCreated && !isCompleted && childAgeMonths > ageMonth + 3
     }
 }
+
+// MARK: - Completed Ordering
+
+extension Milestone {
+
+    /// Completed milestones in the order a parent reads as "most recent first".
+    ///
+    /// A milestone backfilled during onboarding is completed but carries no
+    /// `dateCompleted` — the parent told us it happened, not when. Those sort
+    /// after everything genuinely dated, so a moment saved five minutes ago
+    /// always outranks a backfill rather than being buried under twelve of them.
+    ///
+    /// Among themselves the undated ones run by descending expected age. Two
+    /// reasons: `sorted(by:)` is not stable, so without a total order the three
+    /// rows "What you've noticed" shows would be an arbitrary pick that could
+    /// differ between renders; and descending age surfaces the most advanced
+    /// things the child already does rather than newborn history.
+    static func recencyOrdered(_ milestones: [Milestone]) -> [Milestone] {
+        milestones.sorted { lhs, rhs in
+            switch (lhs.dateCompleted, rhs.dateCompleted) {
+            case let (left?, right?):
+                return left == right ? lhs.title < rhs.title : left > right
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return lhs.ageMonth == rhs.ageMonth
+                    ? lhs.title < rhs.title
+                    : lhs.ageMonth > rhs.ageMonth
+            }
+        }
+    }
+}

@@ -66,9 +66,7 @@ final class DashboardViewModel {
             ? Double(currentStageCompleted) / Double(currentStageTotal)
             : 0
 
-        completedMilestones = milestones
-            .filter(\.isCompleted)
-            .sorted { ($0.dateCompleted ?? .distantPast) > ($1.dateCompleted ?? .distantPast) }
+        completedMilestones = Milestone.recencyOrdered(milestones.filter(\.isCompleted))
 
         flaggedMilestones = milestones.filter { m in
             !m.isCompleted && age >= m.ageMonth + 2

@@ -12,8 +12,20 @@ struct MilestoneShareCard: View {
     let childName: String
     let photo: UIImage?
 
-    private var dateText: String {
-        (milestone.dateCompleted ?? Date()).formatted(date: .long, time: .omitted)
+    // A milestone the parent backfilled during onboarding is completed but has no
+    // date — they told us it happened, not when. The previous `?? Date()` printed
+    // today's date onto the one artifact designed to leave the phone, which was
+    // simply untrue. With no date the caption is the child's name alone.
+    //
+    // Pulled out as a pure function so the rule is testable without a graphics
+    // context, the same way ReportBuilder is separate from ShareRenderer.
+    static func caption(childName: String, dateCompleted: Date?) -> String {
+        guard let dateCompleted else { return childName }
+        return "\(childName) · \(dateCompleted.formatted(date: .long, time: .omitted))"
+    }
+
+    private var captionText: String {
+        Self.caption(childName: childName, dateCompleted: milestone.dateCompleted)
     }
 
     var body: some View {
@@ -51,7 +63,7 @@ struct MilestoneShareCard: View {
                     .lineLimit(3)
                     .minimumScaleFactor(0.6)
 
-                Text("\(childName) · \(dateText)")
+                Text(captionText)
                     .font(.system(size: 20, design: .rounded))
                     .foregroundStyle(Color(red: 0.42, green: 0.47, blue: 0.48))
 

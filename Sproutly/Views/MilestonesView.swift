@@ -76,9 +76,7 @@ struct MilestonesView: View {
         case .all:
             return milestones
         case .completed:
-            return milestones
-                .filter(\.isCompleted)
-                .sorted { ($0.dateCompleted ?? .distantPast) > ($1.dateCompleted ?? .distantPast) }
+            return Milestone.recencyOrdered(milestones.filter(\.isCompleted))
         }
     }
 
@@ -493,9 +491,10 @@ struct MilestonesView: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
-                    milestone.isCompleted
-                        ? theme.green.opacity(theme.isNightMode ? 0.14 : 0.10)
-                        : theme.text.opacity(theme.isNightMode ? 0.08 : 0.06)
+                    Theme.milestoneRowFill(
+                        for: theme.isNightMode,
+                        isCompleted: milestone.isCompleted
+                    )
                 )
         )
         .accessibilityElement(children: .combine)

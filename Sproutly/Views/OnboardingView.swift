@@ -8,7 +8,12 @@
 import SwiftUI
 import SwiftData
 
-/// Five-step onboarding flow: Welcome → How It Works → Reassurance → Disclaimer → Profile.
+/// Onboarding flow: Welcome → How It Works → Reassurance → Disclaimer → Profile
+/// → What they already do.
+///
+/// The last step only exists when there is something to offer. The seed catalog
+/// starts at six months, so a child younger than that corrected has an empty
+/// list and the flow is five steps — see `hasBackfillStep`.
 struct OnboardingView: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
@@ -22,9 +27,42 @@ struct OnboardingView: View {
     @State private var isPremature = false
     @State private var gestationalWeeks = 40
 
+    // Titles of the milestones the parent says their child already does. Held
+    // here rather than written as they tap, because the child — and therefore
+    // the milestone rows — does not exist until the flow ends.
+    @State private var backfillSelection: Set<String> = []
+
     @FocusState private var isNameFieldFocused: Bool
 
-    private let totalSteps = 5
+    private static let profileStepIndex = 4
+
+    // Corrected age, computed from the profile fields alone. `Child` owns the
+    // one implementation of the correction; this must never grow its own.
+    private var correctedAge: Int {
+        Child.correctedAgeMonths(
+            birthDate: birthDate,
+            isPremature: isPremature,
+            gestationalWeeks: isPremature ? gestationalWeeks : 40
+        )
+    }
+
+    private var backfillCandidates: [BackfillCandidate] {
+        BackfillCatalog.candidates(correctedAge: correctedAge)
+    }
+
+    // Offering an empty list would be a step that asks a question with no
+    // answers. This is a list check rather than an age check on purpose: the
+    // catalog starts at six months today, and an age threshold would silently
+    // become wrong the moment that changes.
+    private var hasBackfillStep: Bool { !backfillCandidates.isEmpty }
+
+    private var totalSteps: Int { hasBackfillStep ? 6 : 5 }
+
+    private var isBackfillStep: Bool { step == Self.profileStepIndex + 1 }
+
+    private var trimmedName: String {
+        childName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         ZStack {
@@ -44,8 +82,10 @@ struct OnboardingView: View {
                         reassuranceStep
                     } else if step == 3 {
                         disclaimerStep
-                    } else {
+                    } else if step == Self.profileStepIndex {
                         profileStep
+                    } else {
+                        backfillStep
                     }
                 }
                 .transition(.identity)
@@ -383,6 +423,15 @@ private extension OnboardingView {
 #endif
     }
 
+    // Step 6: What they already do. Only reached when the list is non-empty.
+    var backfillStep: some View {
+        OnboardingBackfillStep(
+            childName: trimmedName.isEmpty ? "your little one" : trimmedName,
+            candidates: backfillCandidates,
+            selection: $backfillSelection
+        )
+    }
+
     // Helper: form field label — icon carries the accent color, text stays
     // neutral. An all-blue label (icon + text) reads as unusually loud for a
     // form; every standard iOS form (Settings, Contacts) keeps labels neutral
@@ -450,6 +499,69 @@ private extension OnboardingView {
     }
 
     var navigationButtons: some View {
+        Group {
+            if isBackfillStep {
+                backfillButtons
+            } else {
+                standardButtons
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 40)
+    }
+
+    // Two exits, weighted the same. A parent who does not want to sit and tick
+    // twelve boxes on their first minute in the app has not done anything wrong,
+    // and the button that says so must not read as the lesser choice.
+    var backfillButtons: some View {
+        HStack(spacing: 16) {
+            Button {
+                guard !isProcessing else { return }
+#if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+                isProcessing = true
+                completeOnboarding(applying: [])
+            } label: {
+                Text("Skip for now")
+                    .fontWeight(.semibold)
+                    .fixedSize()
+                    .foregroundStyle(theme.text)
+            }
+            .buttonStyle(SoftCapsuleStyle(baseColor: theme.green, nightMode: theme.isNightMode))
+            .disabled(isProcessing)
+
+            Spacer()
+
+            Button {
+                guard !isProcessing else { return }
+#if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+                isProcessing = true
+                completeOnboarding(applying: backfillSelection)
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Done")
+                        .fontWeight(.semibold)
+                        .fixedSize()
+
+                    Image(systemName: "heart.fill")
+                }
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(
+                SoftCapsuleStyle(
+                    baseColor: theme.blue,
+                    isAction: true,
+                    nightMode: theme.isNightMode
+                )
+            )
+            .disabled(isProcessing)
+        }
+    }
+
+    var standardButtons: some View {
         HStack(spacing: 16) {
             if step > 0 {
                 Button {
@@ -504,19 +616,27 @@ private extension OnboardingView {
             .disabled((step == totalSteps - 1 && childName.isEmpty) || isProcessing)
             .opacity((step == totalSteps - 1 && childName.isEmpty) ? 0.5 : 1)
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 40)
     }
 
     // Creating the first child is what ends onboarding — ContentView switches over
     // as soon as the store has one.
-    func completeOnboarding() {
-        childStore.addChild(
-            name: childName.trimmingCharacters(in: .whitespacesAndNewlines),
+    //
+    // The backfill selection is applied here rather than as the parent taps,
+    // because the milestone rows it marks are created by `addChild` on the line
+    // above: until then there is nothing to mark. Titles are the join, which is
+    // safe because every title in the seed catalog is unique.
+    func completeOnboarding(applying backfilledTitles: Set<String> = []) {
+        let child = childStore.addChild(
+            name: trimmedName,
             birthDate: birthDate,
             isPremature: isPremature,
             gestationalWeeks: isPremature ? gestationalWeeks : 40
         )
+
+        guard !backfilledTitles.isEmpty else { return }
+
+        BackfillCatalog.apply(backfilledTitles, to: child)
+        childStore.save()
     }
 }
 
