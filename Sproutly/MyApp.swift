@@ -165,6 +165,7 @@ struct MyApp: App {
     @State private var childStore = ChildStore(context: sharedAppContainer.mainContext)
     @State private var themeManager = ThemeManager()
     @State private var purchases = PurchaseManager()
+    @State private var notifications = NotificationManager()
 
     init() {
         _ = SproutlyFont.didRegister
@@ -176,6 +177,7 @@ struct MyApp: App {
                 .environment(childStore)
                 .environment(themeManager)
                 .environment(purchases)
+                .environment(notifications)
                 .preferredColorScheme(themeManager.preferredColorScheme)
         }
         .modelContainer(sharedAppContainer)
@@ -188,6 +190,7 @@ struct ContentView: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(ThemeManager.self) private var theme
     @Environment(PurchaseManager.self) private var purchases
+    @Environment(NotificationManager.self) private var notifications
     @Environment(\.scenePhase) private var scenePhase
     // Read here and mirrored onto ThemeManager so the whole app resolves one
     // set of colours, rather than each view reading the environment and
@@ -235,6 +238,11 @@ struct ContentView: View {
             // Silent restore: the second parent on Family Sharing, or anyone who
             // reinstalled, must never be shown a paywall for something already owned.
             await purchases.start()
+
+            // Opening the app is what resets auto-quiet, so it is recorded
+            // before the window is planned rather than after.
+            notifications.recordAppOpened()
+            await notifications.reschedule(for: childStore.activeChild)
         }
         // CLAUDE.md's own stated intent is "re-checked every launch" — but a
         // resume from background isn't a launch, and isPro was only ever set
@@ -243,6 +251,17 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, hasImported else { return }
             Task { await purchases.refreshEntitlements() }
+            // The pending window rolls forward here rather than being queued far
+            // ahead, which keeps it well inside the 64 pending-request cap and
+            // stops a stale plan from firing after the facts changed.
+            Task {
+                notifications.recordAppOpened()
+                await notifications.reschedule(for: childStore.activeChild)
+            }
+        }
+        // Switching or adding a child replaces the plan; it never adds a second.
+        .onChange(of: childStore.activeChild?.id) { _, _ in
+            Task { await notifications.reschedule(for: childStore.activeChild) }
         }
     }
 

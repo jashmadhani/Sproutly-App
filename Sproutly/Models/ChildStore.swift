@@ -107,6 +107,18 @@ final class ChildStore {
             PhotoStore.delete(milestone.photoFilename)
         }
 
+        // Per-child state lives outside SwiftData, so the cascade does not reach
+        // it. Left behind, the baseline would be re-applied to an unrelated
+        // future child if a UUID ever repeated, and the dismissal key would
+        // simply leak.
+        CatalogBaseline.clear(for: child.id)
+        DailyCardDismissal.clear(for: child.id)
+
+        // Anything already queued names this child. Cancelled here so a deleted
+        // child's name can never surface on a lock screen afterwards; the next
+        // reschedule re-plans for whoever remains.
+        NotificationCancellation.cancelAllPending()
+
         // Cascade delete rule removes the child's milestones with them.
         context.delete(child)
         save()

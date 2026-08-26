@@ -25,6 +25,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ChildStore.self) private var childStore
     @Environment(PurchaseManager.self) private var purchases
+    @Environment(NotificationManager.self) private var notifications
 
     // MainTabView only renders once a child exists; the fallback keeps this view
     // total without threading an optional through every call site.
@@ -48,6 +49,21 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: Theme.sectionSpacing) {
                     headerCard
+
+                    DailyNoticeCard(
+                        child: child,
+                        milestones: milestones,
+                        correctedAge: viewModel.correctedAge,
+                        excludedBands: viewModel.excludedBands
+                    ) { _ in
+                        viewModel.update(milestones: milestones, child: child)
+                        childStore.save()
+                        Task { await notifications.reschedule(for: childStore.activeChild) }
+                    }
+
+                    if notifications.shouldOfferPermissionPrompt {
+                        notificationPrompt
+                    }
 
                     // A baby younger than the first band Sproutly covers has
                     // nothing to show in a ring, and rendering one at zero — or
@@ -244,6 +260,70 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Milestone progress")
         .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones completed for \(viewModel.targetAgeMonth) months")
+    }
+
+    // MARK: - Notification Prompt
+
+    // The only place Sproutly ever raises notifications on its own, and it
+    // appears once, after the parent has saved three milestones with a date on
+    // them. Dismissing it settles the matter permanently — see
+    // `NotificationManager.shouldOfferPermissionPrompt`.
+    private var notificationPrompt: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Want a nudge now and then?")
+                .font(Theme.sproutlyCardTitle)
+                .foregroundStyle(theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("One quiet note in the morning with something to look for, and a look back at the week on Sundays. Never more than one a day.")
+                .font(Theme.sproutlyBody)
+                .foregroundStyle(theme.textSecondary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 12) {
+                Button {
+                    notifications.dismissPermissionPrompt()
+                } label: {
+                    Text("No thanks")
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(theme.text)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(theme.recessedFill)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task {
+                        let granted = await notifications.requestAuthorization()
+                        if granted {
+                            notifications.setMasterEnabled(true)
+                            await notifications.reschedule(for: childStore.activeChild)
+                        }
+                        notifications.dismissPermissionPrompt()
+                    }
+                } label: {
+                    Text("Yes, please")
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(.white)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(theme.blue)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .warmCard(nightMode: theme.isNightMode)
     }
 
     // MARK: - Before the First Band

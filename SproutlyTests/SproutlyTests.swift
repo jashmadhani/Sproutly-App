@@ -1091,6 +1091,502 @@ final class BackfillTests: XCTestCase {
     }
 }
 
+// MARK: - Notifications
+
+@MainActor
+final class NotificationPlannerTests: XCTestCase {
+
+    private var container: ModelContainer!
+    private let childID = UUID()
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    /// A Monday, so weekday arithmetic in the tests is unambiguous.
+    private var monday: Date {
+        calendar.date(from: DateComponents(year: 2026, month: 8, day: 24, hour: 8))!
+    }
+
+    private func makeChild(ageMonths: Int) throws -> Child {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let birth = calendar.date(byAdding: .month, value: -ageMonths, to: monday)!
+        let child = Child(name: "Aanya", birthDate: birth)
+        container.mainContext.insert(child)
+        DataSeeder.seed(for: child, in: container.mainContext)
+        return child
+    }
+
+    private var allOn: NotificationSettings {
+        NotificationSettings(
+            masterEnabled: true,
+            enabledKinds: Set(SproutlyNotificationKind.allCases)
+        )
+    }
+
+    private func plan(
+        child: Child,
+        correctedAge: Int,
+        settings: NotificationSettings? = nil,
+        daysAway: Int = 0,
+        now: Date? = nil
+    ) -> [PlannedNotification] {
+        NotificationPlanner.plan(
+            childID: child.id,
+            childName: child.displayName,
+            correctedAge: correctedAge,
+            milestones: child.sortedMilestones,
+            excludedBands: [],
+            settings: settings ?? allOn,
+            daysSinceLastOpened: daysAway,
+            now: now ?? monday,
+            calendar: calendar
+        )
+    }
+
+    // MARK: The one-a-day cap
+
+    func testNeverMoreThanOneNotificationOnACalendarDay() throws {
+        let child = try makeChild(ageMonths: 14)
+
+        // Give every day in the window an anniversary candidate as well as a
+        // daily notice, so collisions are guaranteed.
+        for milestone in child.sortedMilestones.prefix(8) {
+            milestone.isCompleted = true
+            milestone.dateCompleted = calendar.date(byAdding: .year, value: -1, to: monday)
+        }
+
+        let planned = plan(child: child, correctedAge: 14)
+        let days = planned.map { DailyNoticePicker.dayNumber(for: $0.fireDate, calendar: calendar) }
+
+        XCTAssertFalse(planned.isEmpty)
+        XCTAssertEqual(Set(days).count, days.count, "two notifications landed on one day")
+    }
+
+    // MARK: The fire window
+
+    func testNothingIsEverScheduledOutsideNineToSeven() throws {
+        let child = try makeChild(ageMonths: 14)
+        for milestone in child.sortedMilestones.prefix(4) {
+            milestone.isCompleted = true
+            milestone.dateCompleted = calendar.date(byAdding: .year, value: -1, to: monday)
+        }
+
+        let planned = plan(child: child, correctedAge: 14)
+        XCTAssertFalse(planned.isEmpty)
+
+        for notification in planned {
+            let hour = calendar.component(.hour, from: notification.fireDate)
+            XCTAssertGreaterThanOrEqual(hour, NotificationPlanner.earliestHour, "fires at \(hour):00")
+            XCTAssertLessThan(hour, NotificationPlanner.latestHour, "fires at \(hour):00")
+        }
+    }
+
+    // A mis-set constant must fail to schedule rather than fire at midnight.
+    func testTimeBuilderRefusesHoursOutsideTheWindow() {
+        XCTAssertNil(NotificationPlanner.time(3, 0, on: monday, calendar: calendar))
+        XCTAssertNil(NotificationPlanner.time(22, 0, on: monday, calendar: calendar))
+        XCTAssertNotNil(NotificationPlanner.time(9, 30, on: monday, calendar: calendar))
+    }
+
+    // MARK: Collision
+
+    func testAnniversaryBeatsTheDailyNoticeOnTheSameDay() throws {
+        let child = try makeChild(ageMonths: 14)
+        let milestone = try XCTUnwrap(child.sortedMilestones.first)
+        milestone.isCompleted = true
+        // Exactly one year before tomorrow, so it lands inside the window.
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: monday)!
+        milestone.dateCompleted = calendar.date(byAdding: .year, value: -1, to: tomorrow)
+
+        let planned = plan(child: child, correctedAge: 14)
+        let tomorrowDay = DailyNoticePicker.dayNumber(for: tomorrow, calendar: calendar)
+        let onThatDay = planned.filter {
+            DailyNoticePicker.dayNumber(for: $0.fireDate, calendar: calendar) == tomorrowDay
+        }
+
+        XCTAssertEqual(onThatDay.count, 1)
+        XCTAssertEqual(onThatDay.first?.kind, .anniversary)
+    }
+
+    // A backfilled milestone has no date, so it can never have an anniversary.
+    // Celebrating a day that never happened would be a fabrication.
+    func testBackfilledMilestonesNeverProduceAnAnniversary() throws {
+        let child = try makeChild(ageMonths: 14)
+        for milestone in child.sortedMilestones {
+            milestone.isCompleted = true
+            milestone.dateCompleted = nil
+        }
+
+        let planned = plan(child: child, correctedAge: 14)
+        XCTAssertFalse(planned.contains { $0.kind == .anniversary })
+    }
+
+    // MARK: Weekly reflection
+
+    func testWeeklyReflectionIsSkippedEntirelyWhenTheWeekHadNoLogs() throws {
+        let child = try makeChild(ageMonths: 14)
+
+        let planned = plan(child: child, correctedAge: 14)
+        XCTAssertFalse(
+            planned.contains { $0.kind == .weeklyReflection },
+            "an empty week must pass in silence"
+        )
+    }
+
+    func testWeeklyReflectionAppearsOnSundayWhenSomethingWasLogged() throws {
+        let child = try makeChild(ageMonths: 14)
+        let milestone = try XCTUnwrap(child.sortedMilestones.first)
+        milestone.isCompleted = true
+        milestone.dateCompleted = calendar.date(byAdding: .day, value: -1, to: monday)
+
+        let planned = plan(
+            child: child,
+            correctedAge: 14,
+            settings: NotificationSettings(masterEnabled: true, enabledKinds: [.weeklyReflection])
+        )
+
+        let weekly = planned.filter { $0.kind == .weeklyReflection }
+        XCTAssertEqual(weekly.count, 1)
+        for notification in weekly {
+            XCTAssertEqual(calendar.component(.weekday, from: notification.fireDate), 1)
+        }
+    }
+
+    // MARK: Auto-quiet
+
+    func testAutoQuietDegradesAtFourteenDaysAndStopsAtThirty() throws {
+        let child = try makeChild(ageMonths: 14)
+        let milestone = try XCTUnwrap(child.sortedMilestones.first)
+        milestone.isCompleted = true
+        milestone.dateCompleted = calendar.date(byAdding: .day, value: -1, to: monday)
+
+        XCTAssertEqual(QuietLevel.forDaysAway(0), .normal)
+        XCTAssertEqual(QuietLevel.forDaysAway(13), .normal)
+        XCTAssertEqual(QuietLevel.forDaysAway(14), .weeklyOnly)
+        XCTAssertEqual(QuietLevel.forDaysAway(29), .weeklyOnly)
+        XCTAssertEqual(QuietLevel.forDaysAway(30), .silent)
+
+        // At fourteen days the daily notice is gone but the weekly survives.
+        let quieted = plan(child: child, correctedAge: 14, daysAway: 14)
+        XCTAssertFalse(quieted.contains { $0.kind == .dailyNotice })
+        XCTAssertFalse(quieted.contains { $0.kind == .anniversary })
+
+        // At thirty, nothing at all until they come back on their own.
+        XCTAssertTrue(plan(child: child, correctedAge: 14, daysAway: 30).isEmpty)
+        XCTAssertTrue(plan(child: child, correctedAge: 14, daysAway: 90).isEmpty)
+    }
+
+    // MARK: The youngest babies
+
+    func testUnderTwoMonthsNeverExceedsTwoNotificationsAWeek() throws {
+        let child = try makeChild(ageMonths: 0)
+
+        let planned = plan(child: child, correctedAge: 0)
+
+        XCTAssertTrue(NotificationPlanner.isYoungInfant(correctedAge: 0))
+        XCTAssertLessThanOrEqual(
+            planned.count, NotificationPlanner.youngInfantWeeklyCap,
+            "a newborn's parent was sent \(planned.count) notifications in a week"
+        )
+
+        // And never on consecutive days at a daily cadence.
+        XCTAssertLessThanOrEqual(planned.count, 2)
+    }
+
+    func testMasterSwitchOffMeansNothingAtAll() throws {
+        let child = try makeChild(ageMonths: 14)
+        let planned = plan(child: child, correctedAge: 14, settings: .allOff)
+        XCTAssertTrue(planned.isEmpty)
+    }
+
+    // MARK: Copy
+
+    // The lock screen is readable by anyone standing nearby, and a milestone
+    // name there turns an invitation into a demand.
+    func testDailyNoticeBodyNeverNamesTheMilestone() throws {
+        let child = try makeChild(ageMonths: 14)
+        let titles = Set(child.sortedMilestones.map(\.title))
+
+        let planned = plan(child: child, correctedAge: 14)
+        for notification in planned where notification.kind == .dailyNotice {
+            for title in titles {
+                XCTAssertFalse(
+                    notification.body.contains(title),
+                    "daily notice body named \"\(title)\""
+                )
+            }
+        }
+    }
+
+    func testNoNotificationCopyUsesAlarmingLanguage() throws {
+        let child = try makeChild(ageMonths: 14)
+        for milestone in child.sortedMilestones.prefix(4) {
+            milestone.isCompleted = true
+            milestone.dateCompleted = calendar.date(byAdding: .day, value: -1, to: monday)
+        }
+
+        let banned = ["delayed", "behind", "late", "at risk", "failed", "missed",
+                      "haven't", "streak", "don't forget", "hurry"]
+        var copy = plan(child: child, correctedAge: 14).flatMap { [$0.title, $0.body] }
+        copy += SproutlyNotificationKind.allCases.flatMap {
+            [$0.settingsTitle, $0.settingsDescription]
+        }
+
+        for line in copy {
+            let lowered = line.lowercased()
+            for word in banned {
+                XCTAssertFalse(lowered.contains(word), "\"\(line)\" contains \"\(word)\"")
+            }
+        }
+    }
+}
+
+// MARK: - Daily Notice Card Selection
+
+@MainActor
+final class DailyNoticeTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeChild(ageMonths: Int) throws -> Child {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let birth = Calendar.current.date(byAdding: .month, value: -ageMonths, to: Date())!
+        let child = Child(name: "Aanya", birthDate: birth)
+        container.mainContext.insert(child)
+        DataSeeder.seed(for: child, in: container.mainContext)
+        return child
+    }
+
+    private let day = Date(timeIntervalSince1970: 1_756_000_000)
+
+    // Same child, same day, same answer — no matter how many times the view
+    // re-renders or the app is relaunched.
+    func testSelectionIsDeterministicForAChildAndDay() throws {
+        let child = try makeChild(ageMonths: 14)
+
+        let picks = (0..<25).map { _ in
+            DailyNoticePicker.pick(
+                from: child.sortedMilestones,
+                correctedAge: 14,
+                childID: child.id,
+                day: day
+            )?.title
+        }
+
+        XCTAssertNotNil(picks.first ?? nil)
+        XCTAssertEqual(Set(picks).count, 1, "the suggestion reshuffled between calls")
+    }
+
+    // The stable hash is the whole reason it holds across launches: Swift seeds
+    // Hasher randomly per process, so hashValue would not.
+    func testStableHashDoesNotDependOnProcessSeed() {
+        XCTAssertEqual(
+            DailyNoticePicker.stableHash("aanya|20321"),
+            DailyNoticePicker.stableHash("aanya|20321")
+        )
+        XCTAssertNotEqual(
+            DailyNoticePicker.stableHash("aanya|20321"),
+            DailyNoticePicker.stableHash("aanya|20322")
+        )
+    }
+
+    func testANewDayCanGiveANewSuggestion() throws {
+        let child = try makeChild(ageMonths: 24)
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: day)!
+
+        let today = DailyNoticePicker.pick(
+            from: child.sortedMilestones, correctedAge: 24, childID: child.id, day: day
+        )
+        let next = DailyNoticePicker.pick(
+            from: child.sortedMilestones, correctedAge: 24, childID: child.id, day: tomorrow
+        )
+
+        XCTAssertNotNil(today)
+        XCTAssertNotNil(next)
+        // Both valid; the point is the seed changed, not that they must differ.
+        XCTAssertEqual(
+            DailyNoticePicker.dayNumber(for: tomorrow),
+            DailyNoticePicker.dayNumber(for: day) + 1
+        )
+    }
+
+    func testNeverSuggestsAParentAuthoredMoment() throws {
+        let child = try makeChild(ageMonths: 14)
+        // Everything standard already saved, so only the parent's own is left.
+        for milestone in child.milestones where !milestone.isUserCreated {
+            milestone.isCompleted = true
+        }
+        let own = Milestone(
+            title: "First swim",
+            category: MilestoneCategory.socialEmotional.rawValue,
+            ageMonth: 14,
+            child: child,
+            isUserCreated: true
+        )
+        container.mainContext.insert(own)
+        try container.mainContext.save()
+
+        let pick = DailyNoticePicker.pick(
+            from: child.sortedMilestones, correctedAge: 14, childID: child.id, day: day
+        )
+        XCTAssertNil(pick, "suggested the parent notice their own entry")
+    }
+
+    // With nothing left at or below their age it falls forward to the nearest
+    // band ahead — which is what every baby under two months gets.
+    func testFallsForwardWhenEverythingAtOrBelowAgeIsSaved() throws {
+        let child = try makeChild(ageMonths: 14)
+        for milestone in child.milestones where milestone.ageMonth <= 14 {
+            milestone.isCompleted = true
+        }
+
+        let pick = try XCTUnwrap(
+            DailyNoticePicker.pick(
+                from: child.sortedMilestones, correctedAge: 14, childID: child.id, day: day
+            )
+        )
+        XCTAssertGreaterThan(pick.ageMonth, 14)
+        XCTAssertEqual(pick.ageMonth, 15, "should reach for the nearest band, not a distant one")
+    }
+
+    func testNewbornGetsTheNearestUpcomingBand() throws {
+        let child = try makeChild(ageMonths: 0)
+        let pick = try XCTUnwrap(
+            DailyNoticePicker.pick(
+                from: child.sortedMilestones, correctedAge: 0, childID: child.id, day: day
+            )
+        )
+        XCTAssertEqual(pick.ageMonth, 2)
+    }
+
+    func testExcludedBandsAreNeverSuggested() throws {
+        let child = try makeChild(ageMonths: 24)
+        let pick = DailyNoticePicker.pick(
+            from: child.sortedMilestones,
+            correctedAge: 24,
+            excludedBands: [2, 4, 6, 9, 12, 15, 18, 24],
+            childID: child.id,
+            day: day
+        )
+        XCTAssertNotNil(pick)
+        XCTAssertGreaterThan(try XCTUnwrap(pick).ageMonth, 24)
+    }
+
+    func testNilOnlyWhenThereIsGenuinelyNothingLeft() throws {
+        let child = try makeChild(ageMonths: 60)
+        for milestone in child.milestones {
+            milestone.isCompleted = true
+        }
+        XCTAssertNil(
+            DailyNoticePicker.pick(
+                from: child.sortedMilestones, correctedAge: 60, childID: child.id, day: day
+            )
+        )
+    }
+
+    // MARK: Dismissal
+
+    func testDismissalPersistsForTheDayAndClearsTheNext() throws {
+        let child = try makeChild(ageMonths: 14)
+        defer { DailyCardDismissal.clear(for: child.id) }
+
+        XCTAssertFalse(DailyCardDismissal.isDismissed(for: child.id, on: day))
+
+        DailyCardDismissal.dismiss(for: child.id, on: day)
+        XCTAssertTrue(DailyCardDismissal.isDismissed(for: child.id, on: day))
+
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: day)!
+        XCTAssertFalse(
+            DailyCardDismissal.isDismissed(for: child.id, on: tomorrow),
+            "\"Not yet\" must only hide today's card"
+        )
+    }
+}
+
+// MARK: - Log Counter
+
+@MainActor
+final class MilestoneLogCounterTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        MilestoneLogCounter.reset()
+    }
+
+    override func tearDown() {
+        MilestoneLogCounter.reset()
+        super.tearDown()
+    }
+
+    func testOnlyDatedCompletionsCount() {
+        let logged = Milestone(
+            title: "Waves", category: "Language", ageMonth: 12,
+            isCompleted: true, dateCompleted: Date()
+        )
+        let incomplete = Milestone(title: "Runs", category: "Gross Motor", ageMonth: 18)
+
+        MilestoneLogCounter.record(logged)
+        MilestoneLogCounter.record(incomplete)
+
+        XCTAssertEqual(MilestoneLogCounter.count, 1)
+    }
+
+    // The gate for both one-time nudges. A parent who backfilled twelve
+    // milestones during onboarding has not yet used the app, and must not be
+    // treated as though they had.
+    func testBackfilledMilestonesNeverAdvanceTheCounter() {
+        for index in 0..<12 {
+            let backfilled = Milestone(
+                title: "Backfilled \(index)", category: "Cognitive", ageMonth: 6,
+                isCompleted: true, dateCompleted: nil
+            )
+            MilestoneLogCounter.record(backfilled)
+        }
+
+        XCTAssertEqual(MilestoneLogCounter.count, 0)
+    }
+
+    func testPromptIsOfferedOnlyAfterThreeGenuineLogsAndOnlyOnce() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: NotificationManager.Keys.promptDismissed)
+        defaults.removeObject(forKey: NotificationManager.Keys.hasAsked)
+        defaults.removeObject(forKey: NotificationManager.Keys.authorizationDenied)
+        defer {
+            defaults.removeObject(forKey: NotificationManager.Keys.promptDismissed)
+            defaults.removeObject(forKey: NotificationManager.Keys.hasAsked)
+            defaults.removeObject(forKey: NotificationManager.Keys.authorizationDenied)
+        }
+
+        // No notification system touched anywhere in this test.
+        let manager = NotificationManager(center: nil)
+        XCTAssertFalse(manager.shouldOfferPermissionPrompt)
+
+        for index in 0..<NotificationManager.Keys.promptAfterLogs {
+            MilestoneLogCounter.record(
+                Milestone(
+                    title: "Logged \(index)", category: "Language", ageMonth: 12,
+                    isCompleted: true, dateCompleted: Date()
+                )
+            )
+        }
+        XCTAssertTrue(manager.shouldOfferPermissionPrompt)
+
+        manager.dismissPermissionPrompt()
+        XCTAssertFalse(manager.shouldOfferPermissionPrompt, "the prompt came back after dismissal")
+    }
+}
+
 // MARK: - Purchases
 
 @MainActor

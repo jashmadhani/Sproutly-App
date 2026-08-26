@@ -726,6 +726,10 @@ struct MilestonesView: View {
             milestone.dateCompleted = Date()
             milestone.completionNote = note
         }
+        // One chokepoint for "the parent genuinely logged something", shared
+        // with the daily card and AddMilestoneSheet so the counts that gate the
+        // notification prompt and the photo nudge can't disagree.
+        MilestoneLogCounter.record(milestone)
         saveContext()
     }
 

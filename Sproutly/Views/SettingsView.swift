@@ -12,6 +12,7 @@ import SwiftData
 struct SettingsView: View {
     @Environment(ChildStore.self) private var childStore
     @Environment(PurchaseManager.self) private var purchases
+    @Environment(NotificationManager.self) private var notifications
 
     private var child: Child { childStore.activeChild ?? Child() }
     @Environment(\.modelContext) private var modelContext
@@ -64,6 +65,7 @@ struct SettingsView: View {
                     childrenSection
                     profileSection
                     prematuritySection
+                    notificationsSection
                     moreSection
                     dataSection
                 }
@@ -207,6 +209,106 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
     }
     
+    // MARK: - Notifications
+
+    // Default off, and the master switch is the only thing that can ask for
+    // permission. Turning it on is an explicit tap — Sproutly never requests
+    // authorization at launch or during onboarding.
+    private var notificationsSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Gentle reminders")
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(theme.text)
+
+                    Text("At most one a day, mornings only.")
+                        .font(Theme.sproutlyBody)
+                        .foregroundStyle(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                SproutlySwitch(
+                    isOn: Binding(
+                        get: { notifications.settings.masterEnabled },
+                        set: { wanted in
+                            Task { await setNotifications(enabled: wanted) }
+                        }
+                    ),
+                    nightMode: theme.isNightMode
+                )
+                .accessibilityLabel("Gentle reminders")
+                .accessibilityHint("At most one a day, mornings only")
+            }
+            .padding(.horizontal, Theme.cardPadding)
+            .frame(minHeight: 52)
+
+            if notifications.settings.masterEnabled {
+                ForEach(SproutlyNotificationKind.allCases, id: \.self) { kind in
+                    Theme.divider(nightMode: theme.isNightMode)
+                        .padding(.leading, Theme.cardPadding)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(kind.settingsTitle)
+                                .font(Theme.sproutlyFieldValue)
+                                .foregroundStyle(theme.text)
+
+                            Text(kind.settingsDescription)
+                                .font(Theme.sproutlyMeta)
+                                .foregroundStyle(theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        SproutlySwitch(
+                            isOn: Binding(
+                                get: { notifications.settings.enabledKinds.contains(kind) },
+                                set: { wanted in
+                                    notifications.setKind(kind, enabled: wanted)
+                                    Task {
+                                        await notifications.reschedule(for: childStore.activeChild)
+                                    }
+                                }
+                            ),
+                            nightMode: theme.isNightMode
+                        )
+                        .accessibilityLabel(kind.settingsTitle)
+                    }
+                    .padding(.horizontal, Theme.cardPadding)
+                    .frame(minHeight: 52)
+                }
+            }
+
+            Theme.divider(nightMode: theme.isNightMode)
+                .padding(.leading, Theme.cardPadding)
+
+            // D.3 — what these are, and just as importantly what they are not.
+            Text("These are reminders to look and remember. They aren't medical guidance, and they aren't an assessment of your child.")
+                .font(Theme.sproutlyMeta)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Theme.cardPadding)
+                .padding(.vertical, 12)
+        }
+        .groupedCard(nightMode: theme.isNightMode)
+    }
+
+    private func setNotifications(enabled: Bool) async {
+        if enabled {
+            // The switch is the request. If they decline the system prompt the
+            // switch goes back off and we never ask again.
+            let granted = await notifications.requestAuthorization()
+            guard granted else { return }
+        }
+        notifications.setMasterEnabled(enabled)
+        await notifications.reschedule(for: childStore.activeChild)
+    }
+
     // MARK: - Children
 
     // Roster + add. The list itself is only shown once a second child exists —

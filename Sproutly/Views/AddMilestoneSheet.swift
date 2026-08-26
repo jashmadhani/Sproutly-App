@@ -235,6 +235,10 @@ struct AddMilestoneSheet: View {
         )
 
         modelContext.insert(milestone)
+        // Same chokepoint as the Milestones tab and the daily card. A moment
+        // saved as already-happened counts; one saved as still-to-come has no
+        // date and is ignored, which is exactly how backfill is excluded too.
+        MilestoneLogCounter.record(milestone)
         childStore.save()
         dismiss()
     }
