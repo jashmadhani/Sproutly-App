@@ -311,6 +311,15 @@ private extension OnboardingView {
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
                         .lineSpacing(4)
+
+                    // The real range, stated before the parent invests any time
+                    // — along with where to look instead if their baby is
+                    // younger than the app covers.
+                    Text("Sproutly covers 2 months to 5 years. For a younger baby, your pediatrician and the newborn well-visits are the right place to look.")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(theme.textSecondary)
+                        .lineSpacing(4)
                 }
                 .padding(.horizontal, 20)
             }

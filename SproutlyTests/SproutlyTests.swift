@@ -1784,6 +1784,173 @@ final class ProDiscoverabilityTests: XCTestCase {
     }
 }
 
+// MARK: - Disclaimers, Attribution and Privacy
+
+final class DisclaimerTests: XCTestCase {
+
+    private var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String) throws -> String {
+        try String(contentsOf: repoRoot.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func allDisplayedStrings() -> [(file: String, text: String)] {
+        let root = repoRoot.appendingPathComponent("Sproutly")
+        guard let files = FileManager.default.enumerator(
+            at: root, includingPropertiesForKeys: nil
+        ) else { return [] }
+
+        var found: [(String, String)] = []
+        let literal = try? NSRegularExpression(pattern: #""([^"\\]|\\.)*""#)
+
+        for case let url as URL in files where url.pathExtension == "swift" {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for line in text.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("///") else { continue }
+                let range = NSRange(line.startIndex..., in: line)
+                for match in literal?.matches(in: line, range: range) ?? [] {
+                    guard let r = Range(match.range, in: line) else { continue }
+                    found.append((url.lastPathComponent, String(line[r])))
+                }
+            }
+        }
+        return found
+    }
+
+    // A parent who installs this for a two-week-old and finds nothing to track
+    // writes the one-star review that says the app doesn't work.
+    func testNoStringClaimsCoverageFromBirthOrAgeZero() {
+        let claims = ["from birth", "birth to", "0-5", "0–5", "newborns",
+                      "from day one", "0 to 5"]
+
+        for (file, text) in allDisplayedStrings() {
+            let lowered = text.lowercased()
+            for claim in claims {
+                XCTAssertFalse(
+                    lowered.contains(claim),
+                    "\(file) claims coverage \"\(claim)\": \(text)"
+                )
+            }
+        }
+    }
+
+    func testTheRealAgeRangeIsStatedWhereItMatters() throws {
+        for path in ["Sproutly/Views/OnboardingView.swift",
+                     "Sproutly/Views/AboutDataView.swift",
+                     "AppStore/LISTING.md"] {
+            let text = try source(path)
+            XCTAssertTrue(
+                text.contains("2 months to 5 years"),
+                "\(path) does not state the real age range"
+            )
+        }
+    }
+
+    // D.2 — where to look instead, for a baby younger than the app covers.
+    func testYoungerInfantGuidancePointsToThePediatrician() throws {
+        for path in ["Sproutly/Views/OnboardingView.swift",
+                     "Sproutly/Views/AboutDataView.swift"] {
+            let text = try source(path).lowercased()
+            XCTAssertTrue(text.contains("pediatrician"), "\(path) omits the guidance")
+            XCTAssertTrue(text.contains("well-visit"), "\(path) omits the well-visits")
+        }
+    }
+
+    // D.3 — the notification disclaimer.
+    func testNotificationDisclaimerIsPresentAndNotMedical() throws {
+        let text = try source("Sproutly/Views/SettingsView.swift")
+        XCTAssertTrue(text.contains("aren't medical guidance"))
+        XCTAssertTrue(text.contains("aren't an assessment of your child"))
+    }
+
+    // D.4 — all three sources named, and no implied endorsement.
+    func testAttributionNamesAllSourcesAndClaimsNoEndorsement() throws {
+        let text = try source("Sproutly/Views/AboutDataView.swift")
+
+        XCTAssertTrue(text.contains("Learn the Signs"))
+        XCTAssertTrue(text.contains("World Health Organization"))
+        XCTAssertTrue(text.contains("American Academy of Pediatrics"))
+
+        XCTAssertTrue(text.contains("not affiliated with"))
+        XCTAssertTrue(text.contains("endorsed by"))
+        XCTAssertTrue(text.contains("reviewed by"))
+    }
+
+    // Disclaimers must obey the same tone rule as everything else.
+    func testDisclaimerCopyUsesNoAlarmingLanguage() throws {
+        let banned = ["delayed", "behind", "at risk", "failed", "abnormal", "disorder"]
+
+        for path in ["Sproutly/Views/AboutDataView.swift",
+                     "Sproutly/Views/OnboardingView.swift"] {
+            let text = try source(path)
+            let literal = try NSRegularExpression(pattern: #""([^"\\]|\\.)*""#)
+
+            for line in text.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//") else { continue }
+                let range = NSRange(line.startIndex..., in: line)
+                for match in literal.matches(in: line, range: range) {
+                    guard let r = Range(match.range, in: line) else { continue }
+                    let content = String(line[r]).lowercased()
+                    for word in banned {
+                        XCTAssertFalse(content.contains(word), "\(path): \(content)")
+                    }
+                }
+            }
+        }
+    }
+
+    // D.6 — the privacy manifest must not have moved a byte this phase. Nothing
+    // added here makes a network call or touches an API needing a declared
+    // reason; local notifications need neither.
+    func testPrivacyManifestDeclaresNoCollectionAndNoTracking() throws {
+        let manifest = try source("Sproutly/Resources/PrivacyInfo.xcprivacy")
+
+        XCTAssertTrue(manifest.contains("NSPrivacyTracking"))
+        XCTAssertTrue(manifest.contains("CA92.1"), "the UserDefaults reason must remain")
+
+        // Data Not Collected: the collected-types array is present and empty.
+        XCTAssertTrue(manifest.contains("NSPrivacyCollectedDataTypes"))
+        XCTAssertFalse(
+            manifest.contains("NSPrivacyCollectedDataType<"),
+            "a collected data type appeared — App Privacy is no longer Data Not Collected"
+        )
+
+        // And nothing anywhere makes a network call.
+        for (file, _) in allDisplayedStrings() where file.hasSuffix(".swift") {
+            continue
+        }
+        let root = repoRoot.appendingPathComponent("Sproutly")
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for banned in ["URLSession", "URLRequest", "NWConnection", "CFNetwork"] {
+                XCTAssertFalse(
+                    text.contains(banned),
+                    "\(url.lastPathComponent) uses \(banned) — the app must make no network calls"
+                )
+            }
+        }
+    }
+
+    // The listing reference exists and is outside the compiled target.
+    func testListingReferenceExistsAndIsNotInTheTarget() throws {
+        let listing = repoRoot.appendingPathComponent("AppStore/LISTING.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: listing.path))
+
+        // project.yml sources only `- path: Sproutly`, so anything outside that
+        // directory is excluded by construction rather than by a rule.
+        let project = try source("project.yml")
+        XCTAssertTrue(project.contains("- path: Sproutly"))
+        XCTAssertFalse(project.contains("AppStore"))
+    }
+}
+
 // MARK: - Purchases
 
 @MainActor

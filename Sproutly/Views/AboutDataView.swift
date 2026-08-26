@@ -34,13 +34,27 @@ struct AboutDataView: View {
                         .foregroundStyle(theme.text)
                     
                     VStack(spacing: 16) {
-                        Text("Developmental milestones in Sproutly are based on publicly available guidance from the CDC's 'Learn the Signs. Act Early.' program and well-visit screening age guidance published by the American Academy of Pediatrics.")
+                        // The real range the catalog covers. Claiming "from
+                        // birth" would be the kind of mismatch that earns a
+                        // one-star "doesn't work for newborns" review.
+                        Text("Sproutly covers 2 months to 5 years.")
+                            .font(Theme.sproutlyCardTitle)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(theme.text)
+
+                        Text("For a baby under two months, your pediatrician and the newborn well-visits are the right place to look — not this app.")
                             .font(.body)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.textSecondary)
                             .lineSpacing(4)
-                        
-                        Text("Sproutly is an independent educational tool and is not affiliated with, sponsored by, or endorsed by the CDC or the American Academy of Pediatrics.")
+
+                        Text("Milestones in Sproutly are paraphrased from publicly available guidance: the CDC's 'Learn the Signs. Act Early.' program, the World Health Organization's Motor Development Study, and well-visit screening ages published by the American Academy of Pediatrics.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(theme.textSecondary)
+                            .lineSpacing(4)
+
+                        Text("Sproutly is an independent educational tool. It is not affiliated with, sponsored by, endorsed by, or reviewed by the CDC, the World Health Organization, or the American Academy of Pediatrics.")
                             .font(.body)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.textSecondary)

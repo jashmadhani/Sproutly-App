@@ -466,6 +466,44 @@ Xcode is the user's build path, but visual claims should be checked against a re
 - `simctl ui <dev> increase_contrast enabled|disabled` and `simctl ui <dev> content_size accessibility-large` both work live and are the only way to check those paths.
 - **There is no tap automation** — assistive access is denied on this machine, and no MCP gesture tools are exposed. To reach a tab or sheet, temporarily edit `MainTabView.selectedTab` / the sheet's `@State` default, build, screenshot, then **restore from a backup copy** and verify the revert.
 
+## Milestone catalog and the baseline
+
+**The catalog covers 2 months to 5 years** — bands at 2, 4, 6, 9, 12, 15, 18, 24, 30, 36, 48, 60 months, 119 milestones, ten per band (two per category) except the 2-month band, which has nine because fine motor at eight weeks is genuinely one observation. Every band must keep at least one milestone in each of the five `MilestoneCategory` values or `DevelopmentObserver` emits a `DomainStatus` for a domain it has no evidence about. Titles must stay unique across the whole catalog: `reseedIfIncomplete` keys on `(title, ageMonth)`.
+
+Content is paraphrased — never quoted — from CDC "Learn the Signs. Act Early." (2022, public domain), cross-checked against the WHO Motor Development Study (**not** public domain, so the same paraphrase discipline applies), plus AAP well-visit ages. A handful of 15- and 30-month items come from general pediatric practice because the CDC entries for those ages duplicate bands already shipped; see the comments above `fifteenMonth` and `thirtyMonth`.
+
+**Known limitation:** CDC 2022 sets milestones at the 75th percentile, while the original eight bands were written against a ~50th-percentile basis. The two are mixed deliberately and the existing bands were not retrofitted, so `DomainStatus`'s 0.75 threshold means something slightly different in the new bands. Accepted for 1.0.
+
+**`CatalogBaseline` is why growing the catalog is safe.** Adding a band retroactively hands every existing child a fresh set of incomplete milestones for an age they have already passed. Left alone that downgrades a diligent parent's domain status overnight and can raise the Development Focus card — an Early Intervention prompt nobody asked for, caused by a content update. So `reseedIfIncomplete` records any band that is *new to that child* and *already behind them*, and those bands are excluded from `DevelopmentObserver`, `DashboardViewModel.flaggedMilestones`, `categoryStats`, `DailyNoticePicker`, and `ReportBuilder.notYetMet`. A freshly seeded child records nothing — they meet the whole catalog in onboarding. Equal ages are not excluded.
+
+**Below the first band there is no ring.** `DashboardViewModel.resolveTargetAge` returns `Int?` and yields nil when the child has reached no band; `hasReachedFirstBand` then swaps the ring, the domain tiles and the focus card for `comingSoonCard`. It must never fall *forward* to the nearest bracket — that is what rendered "0 of 10" to a three-week-old's parent.
+
+## Notifications
+
+Local only. No push, no remote, no entitlement, no Info.plist usage string, and no `PrivacyInfo.xcprivacy` entry — scheduling a local notification accesses no API needing a declared reason.
+
+`NotificationPlanner` is pure (no `UNUserNotificationCenter`, no clock of its own) so every rule is testable without an authorization grant; `NotificationManager` only asks permission, submits the plan, and holds the `UserDefaults` state. Rules that are load-bearing: **at most one per calendar day** (highest priority wins — anniversary > weekly > daily), **09:00–19:00 only** (`NotificationPlanner.time` returns nil outside it, so a mis-set constant fails to schedule rather than firing at night), a rolling 7-day window refreshed on foreground rather than a long queue, auto-quiet at 14 days (weekly only) and 30 days (silence), and **at most two a week, never daily, below two months corrected**.
+
+The daily notice body never names a milestone — a lock screen is readable over a shoulder, and a name there turns an invitation into a demand. Backfilled milestones have no `dateCompleted`, so they can never fire an anniversary; that is correct and must not be "fixed". Anniversary photos are **copied to a temp file first** — `UNNotificationAttachment` takes ownership of the URL it is given and would relocate the parent's only copy out of `MilestonePhotos`.
+
+Permission is requested only from an explicit tap (the Settings master switch, or the one dashboard prompt after three logged milestones). Declined once, never asked again.
+
+**`MilestoneLogCounter` is the single chokepoint** for "the parent genuinely logged something" — `MilestonesView.commitToggle`, `AddMilestoneSheet`, and `DailyNoticeCard` all call `record(_:)`, which ignores anything with a nil `dateCompleted`. That is what structurally excludes onboarding backfill from both the notification prompt (3) and the photo nudge (5).
+
+## UserDefaults keys
+
+`sproutly_active_child_id` · `nightModeEnabled` · `sproutly_did_show_store_recovery_notice` · `sproutly_profile` / `elitegrowth_profile` (legacy) · `sproutly_catalog_baseline_<childUUID>` · `sproutly_daily_card_dismissed_<childUUID>` · `sproutly_logged_milestone_count` · `sproutly_photo_nudge_dismissed` · `sproutly_notify_master` · `sproutly_notify_<kind>` · `sproutly_notify_authorization_denied` · `sproutly_notify_has_asked` · `sproutly_notify_prompt_dismissed` · `sproutly_last_opened`
+
+Per-child keys are cleared in `ChildStore.delete`; the cascade does not reach them.
+
+## Pro discoverability and pricing
+
+Gated features are **visible with a lock**, never hidden — a feature a free parent never sees converts at zero. Gates today: second child and App Icon (Settings), photos / custom milestones / share cards (Milestones), PDF report (Dashboard). Settings carries one quiet Pro row with the feature list open beneath it, readable without opening the paywall. The paywall stays reach-triggered: never at launch, never in onboarding, never from a notification.
+
+**No price or currency symbol may appear anywhere in the target**, including comments and fallbacks. Every figure comes from `product.displayPrice`; before the product resolves the paywall shows a spinner, never a stand-in number. `ProDiscoverabilityTests.testNoHardcodedCurrencyAnywhereInTheTarget` enforces this over string literals and comments.
+
 ## Open decisions
 
+- **Disclaimer text is not versioned.** There is no version key and no acceptance flag anywhere, so a materially changed disclaimer cannot be re-shown to existing users. Deliberately not built — flagged so the decision is conscious.
+- **The PDF report is Pro-gated.** It is arguably the app's strongest differentiator and its best word-of-mouth artifact — a parent handing it to a pediatrician is the most effective advertising Sproutly could have, and the gate stops that happening for free users. Moving the gate to photos and share cards alone would mean editing the `.report` case out of the `DashboardView` guard and removing it from `PaywallReason.allFeatures`; the paywall would then need a fourth feature to stay substantial. Reported, deliberately not acted on.
 - **`ScreeningCheckpoint` is factually inconsistent.** `allCheckpoints` (`ScreeningCardView.swift`) holds only 9- and 30-month entries, while `GrowthInsightsView` tells parents screening happens at "9, 18, and 30 months". Verified, deliberately not fixed — adding an 18-month checkpoint changes what the app tells parents about their child's health, so it needs a product decision, not a code fix. Don't invent the missing checkpoint.
