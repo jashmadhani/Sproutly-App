@@ -64,15 +64,21 @@ struct DomainObservation: Identifiable {
 struct DevelopmentObserver {
     
 
+    /// - Parameter excludedBands: age bands this child was never shown in time,
+    ///   from `CatalogBaseline`. They are left out of the count entirely rather
+    ///   than counted as incomplete, which would judge a parent for content that
+    ///   did not exist while their child was that age.
     static func observe(
         milestones: [Milestone],
-        correctedAge: Int
+        correctedAge: Int,
+        excludedBands: Set<Int> = []
     ) -> [DomainObservation] {
         MilestoneCategory.allCases.map { category in
             observeDomain(
                 category: category,
                 milestones: milestones,
-                correctedAge: correctedAge
+                correctedAge: correctedAge,
+                excludedBands: excludedBands
             )
         }
     }
@@ -82,7 +88,8 @@ struct DevelopmentObserver {
     private static func observeDomain(
         category: MilestoneCategory,
         milestones: [Milestone],
-        correctedAge: Int
+        correctedAge: Int,
+        excludedBands: Set<Int>
     ) -> DomainObservation {
         // Milestones up to current age. Parent-authored moments are deliberately
         // excluded: they carry no clinical expectation, and counting them would
@@ -91,6 +98,7 @@ struct DevelopmentObserver {
             !$0.isUserCreated
                 && $0.category == category.rawValue
                 && $0.ageMonth <= correctedAge
+                && !excludedBands.contains($0.ageMonth)
         }
         
         let total = relevant.count

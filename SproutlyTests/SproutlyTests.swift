@@ -441,6 +441,331 @@ final class ReportTests: XCTestCase {
     }
 }
 
+// MARK: - Catalog Shape
+
+final class CatalogTests: XCTestCase {
+
+    private let categories: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
+
+    // An empty domain in a band makes DevelopmentObserver emit a DomainStatus
+    // for a domain it has no evidence about.
+    func testEveryBandCoversAllFiveCategories() {
+        let byBand = Dictionary(grouping: DataSeeder.allMilestones, by: \.ageMonth)
+        XCTAssertFalse(byBand.isEmpty)
+
+        for (band, items) in byBand {
+            let present = Set(items.map(\.category))
+            XCTAssertEqual(
+                present, categories,
+                "band \(band) is missing \(categories.subtracting(present))"
+            )
+            XCTAssertGreaterThanOrEqual(items.count, 8, "band \(band) has only \(items.count)")
+            XCTAssertLessThanOrEqual(items.count, 10, "band \(band) has \(items.count)")
+        }
+    }
+
+    // A typo in a category string does not fail to compile — it silently falls
+    // back to .grossMotor and quietly mis-scores a whole domain.
+    func testNoCategoryStringFallsBackToGrossMotor() {
+        for milestone in DataSeeder.allMilestones {
+            XCTAssertTrue(
+                categories.contains(milestone.category),
+                "\"\(milestone.category)\" is not a MilestoneCategory raw value"
+            )
+            if milestone.category != MilestoneCategory.grossMotor.rawValue {
+                XCTAssertNotEqual(
+                    milestone.categoryType, .grossMotor,
+                    "\(milestone.title) fell back to .grossMotor"
+                )
+            }
+        }
+    }
+
+    func testCatalogIsAgeOrderedAndFullyTipped() {
+        let ages = DataSeeder.allMilestones.map(\.ageMonth)
+        XCTAssertEqual(ages, ages.sorted(), "allMilestones must be in age order")
+
+        for milestone in DataSeeder.allMilestones {
+            XCTAssertFalse(
+                milestone.tips.trimmingCharacters(in: .whitespaces).isEmpty,
+                "\(milestone.title) has no tips"
+            )
+        }
+    }
+
+    // Repair keys on (title, ageMonth). A title repeated across two bands would
+    // make the pair ambiguous to a parent even where the code copes.
+    func testTitlesAreUniqueAcrossTheWholeCatalog() {
+        let titles = DataSeeder.allMilestones.map(\.title)
+        XCTAssertEqual(Set(titles).count, titles.count)
+    }
+
+    func testTheFourNewBandsExist() {
+        let bands = Set(DataSeeder.allMilestones.map(\.ageMonth))
+        for band in [2, 4, 15, 30] {
+            XCTAssertTrue(bands.contains(band), "missing the \(band)-month band")
+        }
+    }
+}
+
+// MARK: - Catalog Repair and Baseline
+
+@MainActor
+final class CatalogRepairTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        return container.mainContext
+    }
+
+    /// A child shaped like an install from before the new bands shipped: seeded
+    /// only from the bands the old catalog had.
+    private func makeOldShapedChild(
+        in context: ModelContext,
+        ageMonths: Int,
+        legacyBands: Set<Int> = [6, 9, 12, 18, 24, 36, 48, 60]
+    ) -> Child {
+        let birth = Calendar.current.date(byAdding: .month, value: -ageMonths, to: Date())!
+        let child = Child(name: "Aanya", birthDate: birth)
+        context.insert(child)
+
+        for template in DataSeeder.allMilestones where legacyBands.contains(template.ageMonth) {
+            template.child = child
+            context.insert(template)
+        }
+        try? context.save()
+        return child
+    }
+
+    override func tearDown() {
+        for suite in UserDefaults.standard.dictionaryRepresentation().keys
+        where suite.hasPrefix("sproutly_catalog_baseline_") {
+            UserDefaults.standard.removeObject(forKey: suite)
+        }
+        super.tearDown()
+    }
+
+    // THE critical one. Growing the catalog must never cost a parent a single
+    // thing they saved.
+    func testRepairPreservesCompletionNotesAndPhotosOnAnOldShapedChild() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 20)
+
+        let marked = child.milestones.filter { $0.ageMonth == 12 }
+        XCTAssertEqual(marked.count, 10)
+        let stamp = Date(timeIntervalSince1970: 1_600_000_000)
+        for milestone in marked {
+            milestone.isCompleted = true
+            milestone.dateCompleted = stamp
+            milestone.completionNote = "note for \(milestone.title)"
+            milestone.photoFilename = "photo-\(milestone.ageMonth).jpg"
+        }
+        try context.save()
+
+        let before = child.milestones.count
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+
+        // New bands arrived...
+        XCTAssertGreaterThan(child.milestones.count, before)
+        XCTAssertEqual(child.milestones.count, DataSeeder.allMilestones.count)
+
+        // ...and nothing the parent saved changed.
+        for milestone in child.milestones where milestone.ageMonth == 12 {
+            XCTAssertTrue(milestone.isCompleted, "\(milestone.title) lost completion")
+            XCTAssertEqual(milestone.dateCompleted, stamp)
+            XCTAssertEqual(milestone.completionNote, "note for \(milestone.title)")
+            XCTAssertEqual(milestone.photoFilename, "photo-12.jpg")
+        }
+    }
+
+    func testRepairIsIdempotent() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 20)
+
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        let afterFirst = child.milestones.count
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+
+        XCTAssertEqual(child.milestones.count, afterFirst)
+        XCTAssertEqual(afterFirst, DataSeeder.allMilestones.count)
+    }
+
+    // A band shipped after the child was already older than it must never be
+    // counted against them.
+    func testBandsShippedTooLateAreExcludedFromScoring() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 20)
+
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        let excluded = CatalogBaseline.excludedBands(for: child.id)
+
+        // 2, 4 and 15 are behind a twenty-month-old; 30 and beyond are not.
+        XCTAssertEqual(excluded, [2, 4, 15])
+    }
+
+    func testBandsNotYetReachedAreNotExcluded() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 7)
+
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        let excluded = CatalogBaseline.excludedBands(for: child.id)
+
+        // Only 2 and 4 are behind a seven-month-old. 15 and 30 lie ahead and
+        // will be met in the ordinary way.
+        XCTAssertEqual(excluded, [2, 4])
+    }
+
+    func testAFreshlySeededChildExcludesNothing() throws {
+        let context = try makeContext()
+        let store = ChildStore(context: context)
+        let child = store.addChild(
+            name: "Ravi",
+            birthDate: Calendar.current.date(byAdding: .month, value: -20, to: Date())!
+        )
+
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        XCTAssertTrue(CatalogBaseline.excludedBands(for: child.id).isEmpty)
+    }
+
+    // The whole point: a diligent parent must not be downgraded, and must not be
+    // handed a concern card, because we shipped content overnight.
+    func testUpdatingTheCatalogNeverDowngradesAnExistingChild() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 20)
+
+        // A parent who filled in everything the old catalog ever showed them.
+        for milestone in child.milestones where milestone.ageMonth <= 20 {
+            milestone.isCompleted = true
+            milestone.dateCompleted = Date()
+        }
+        try context.save()
+
+        let viewModel = DashboardViewModel()
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+        XCTAssertFalse(viewModel.hasDevelopmentFocus)
+
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        try context.save()
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+
+        // No concern card, nothing flagged, and every domain still complete.
+        XCTAssertTrue(viewModel.flaggedMilestones.isEmpty)
+        XCTAssertFalse(viewModel.hasDevelopmentFocus)
+
+        let observations = DevelopmentObserver.observe(
+            milestones: child.sortedMilestones,
+            correctedAge: 20,
+            excludedBands: CatalogBaseline.excludedBands(for: child.id)
+        )
+        for observation in observations {
+            XCTAssertEqual(observation.status, .onTrack, "\(observation.category) was downgraded")
+            XCTAssertEqual(observation.ratio, 1.0, accuracy: 0.0001)
+        }
+    }
+
+    // The same protection has to reach the artifact a pediatrician reads.
+    func testReportDoesNotListLateBandsTheParentWasNeverShown() throws {
+        let context = try makeContext()
+        let child = makeOldShapedChild(in: context, ageMonths: 20)
+        DataSeeder.reseedIfIncomplete(for: child, in: context)
+        try context.save()
+
+        let report = ReportBuilder.build(for: child)
+        let flaggedBands = Set(report.notYetMet.map(\.ageMonth))
+
+        XCTAssertTrue(
+            flaggedBands.isDisjoint(with: [2, 4, 15]),
+            "report surfaced bands the parent was never offered: \(flaggedBands)"
+        )
+    }
+}
+
+// MARK: - Before the First Band
+
+@MainActor
+final class YoungInfantTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeChild(ageWeeks: Int) throws -> Child {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let birth = Calendar.current.date(byAdding: .day, value: -ageWeeks * 7, to: Date())!
+        let child = Child(name: "Nia", birthDate: birth)
+        container.mainContext.insert(child)
+        DataSeeder.seed(for: child, in: container.mainContext)
+        return child
+    }
+
+    // A three-week-old's parent must not be shown a ring at zero, a "0 of N",
+    // or a concern of any kind.
+    func testThreeWeekOldGetsTheForwardLookingStateAndNoConcern() throws {
+        let child = try makeChild(ageWeeks: 3)
+        let viewModel = DashboardViewModel()
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+
+        XCTAssertEqual(child.calculateCorrectedAge(), 0)
+        XCTAssertFalse(viewModel.hasReachedFirstBand)
+        XCTAssertEqual(viewModel.currentStageTotal, 0)
+        XCTAssertEqual(viewModel.currentStageCompleted, 0)
+        XCTAssertEqual(viewModel.currentStageProgress, 0)
+        XCTAssertTrue(viewModel.flaggedMilestones.isEmpty)
+        XCTAssertFalse(viewModel.hasDevelopmentFocus)
+
+        // And there is something warm to show instead.
+        XCTAssertEqual(viewModel.upcomingBandMonth, 2)
+        XCTAssertFalse(viewModel.upcomingMilestones.isEmpty)
+    }
+
+    // The observer must not divide by zero or invent a status.
+    func testObserverIsSafeAndCalmWithNoEligibleMilestones() throws {
+        let child = try makeChild(ageWeeks: 3)
+        let observations = DevelopmentObserver.observe(
+            milestones: child.sortedMilestones,
+            correctedAge: 0
+        )
+
+        XCTAssertEqual(observations.count, MilestoneCategory.allCases.count)
+        for observation in observations {
+            XCTAssertEqual(observation.total, 0)
+            XCTAssertEqual(observation.status, .onTrack)
+            XCTAssertFalse(observation.ratio.isNaN)
+        }
+    }
+
+    // At two months the app becomes a normal, full experience.
+    func testTwoMonthOldGetsAFullDomainSet() throws {
+        let child = try makeChild(ageWeeks: 9)
+        let viewModel = DashboardViewModel()
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+
+        XCTAssertEqual(child.calculateCorrectedAge(), 2)
+        XCTAssertTrue(viewModel.hasReachedFirstBand)
+        XCTAssertEqual(viewModel.targetAgeMonth, 2)
+        XCTAssertGreaterThan(viewModel.currentStageTotal, 0)
+
+        let observations = DevelopmentObserver.observe(
+            milestones: child.sortedMilestones,
+            correctedAge: 2
+        )
+        for observation in observations {
+            XCTAssertGreaterThan(
+                observation.total, 0,
+                "\(observation.category) has nothing at two months"
+            )
+        }
+    }
+}
+
 // MARK: - Onboarding Backfill
 
 @MainActor
@@ -478,14 +803,23 @@ final class BackfillTests: XCTestCase {
 
     // MARK: Offering
 
-    // The seed catalog starts at six months, so there is nothing to offer a
-    // newborn and the step must not appear at all. This is the case that makes
-    // the skip a list check rather than an age check.
+    /// The bands the shipping catalog actually covers at or below an age.
+    /// Derived rather than written down, so adding a band to `DataSeeder`
+    /// doesn't fail these tests for a reason that isn't a regression.
+    private func catalogBands(upTo age: Int) -> Set<Int> {
+        Set(DataSeeder.allMilestones.map(\.ageMonth).filter { $0 <= age })
+    }
+
+    // Below the first band there is nothing to offer, so the step must not
+    // appear at all. This is the case that makes the skip a list check rather
+    // than an age check — the threshold moves whenever the catalog grows down.
     func testNothingIsOfferedBelowTheFirstMilestoneBracket() {
+        let firstBand = try! XCTUnwrap(DataSeeder.allMilestones.map(\.ageMonth).min())
+        XCTAssertGreaterThan(firstBand, 0, "a newborn must never be offered a list")
+
         XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 0).isEmpty)
-        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 4).isEmpty)
-        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: 5).isEmpty)
-        XCTAssertFalse(BackfillCatalog.candidates(correctedAge: 6).isEmpty)
+        XCTAssertTrue(BackfillCatalog.candidates(correctedAge: firstBand - 1).isEmpty)
+        XCTAssertFalse(BackfillCatalog.candidates(correctedAge: firstBand).isEmpty)
     }
 
     func testOnlyMilestonesAtOrBelowCorrectedAgeAreOffered() {
@@ -493,7 +827,7 @@ final class BackfillTests: XCTestCase {
 
         XCTAssertFalse(candidates.isEmpty)
         XCTAssertTrue(candidates.allSatisfy { $0.ageMonth <= 12 })
-        XCTAssertEqual(Set(candidates.map(\.ageMonth)), [6, 9, 12])
+        XCTAssertEqual(Set(candidates.map(\.ageMonth)), catalogBands(upTo: 12))
     }
 
     // A premature child must be offered against corrected age, not chronological.
@@ -516,9 +850,13 @@ final class BackfillTests: XCTestCase {
         let corrected = BackfillCatalog.candidates(correctedAge: child.calculateCorrectedAge())
         let chronological = BackfillCatalog.candidates(correctedAge: child.chronologicalAgeMonths)
 
-        XCTAssertEqual(Set(corrected.map(\.ageMonth)), [6, 9])
-        XCTAssertEqual(Set(chronological.map(\.ageMonth)), [6, 9, 12])
+        XCTAssertEqual(Set(corrected.map(\.ageMonth)), catalogBands(upTo: 10))
+        XCTAssertEqual(Set(chronological.map(\.ageMonth)), catalogBands(upTo: 12))
+
+        // The point of the test: the two ages genuinely disagree, and the
+        // corrected one is what the parent is shown.
         XCTAssertLessThan(corrected.count, chronological.count)
+        XCTAssertFalse(corrected.contains { $0.ageMonth == 12 })
     }
 
     // Parent-authored moments have no expected age and are inert everywhere that

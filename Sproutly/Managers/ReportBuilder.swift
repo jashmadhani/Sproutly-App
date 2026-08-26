@@ -40,6 +40,7 @@ enum ReportBuilder {
     static func build(for child: Child, on date: Date = Date()) -> MilestoneReport {
         let correctedAge = max(0, child.calculateCorrectedAge())
         let all = child.sortedMilestones
+        let excludedBands = CatalogBaseline.excludedBands(for: child.id)
 
         // Only milestones the child is old enough for. Listing unreached future
         // ages would pad the report with noise a clinician has to filter out.
@@ -65,8 +66,15 @@ enum ReportBuilder {
             generatedOn: date,
             sections: sections,
             ownMoments: all.filter { $0.isUserCreated && $0.isCompleted },
+            // Bands this child was never shown in time are left out. This list
+            // goes in front of a pediatrician, so putting content the parent was
+            // never offered on it would be the most consequential version of the
+            // same mistake the dashboard avoids. See CatalogBaseline.
             notYetMet: standard
-                .filter { $0.isSignificantlyLate(childAgeMonths: correctedAge) }
+                .filter {
+                    $0.isSignificantlyLate(childAgeMonths: correctedAge)
+                        && !excludedBands.contains($0.ageMonth)
+                }
                 .sorted { $0.ageMonth < $1.ageMonth }
         )
     }

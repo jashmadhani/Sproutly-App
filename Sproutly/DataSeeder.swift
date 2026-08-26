@@ -13,9 +13,20 @@ struct DataSeeder {
     // MARK: - All Milestones (used by PreviewMocks)
 
 
+    // Kept in age order. `reseedIfIncomplete` keys on (title, ageMonth), so a
+    // title must stay unique across the whole catalog — a near-duplicate of an
+    // existing band's wording reads to a parent as the same thing asked twice.
+    //
+    // Bands are paraphrased from the CDC's "Learn the Signs. Act Early."
+    // checklists (2022 revision, a US federal work in the public domain), with
+    // gross motor cross-checked against the WHO Motor Development Study so the
+    // set is not purely US-normed. Both are paraphrased rather than quoted;
+    // WHO material is not public domain. Neither organisation has reviewed or
+    // endorsed Sproutly.
     static var allMilestones: [Milestone] {
-        sixMonth + nineMonth + twelveMonth + eighteenMonth
-            + twentyFourMonth + thirtySixMonth + fortyEightMonth + sixtyMonth
+        twoMonth + fourMonth + sixMonth + nineMonth + twelveMonth + fifteenMonth
+            + eighteenMonth + twentyFourMonth + thirtyMonth + thirtySixMonth
+            + fortyEightMonth + sixtyMonth
     }
 
     // MARK: - Entry Points
@@ -46,14 +57,29 @@ struct DataSeeder {
     // only the database rows were deleted, never the file).
     @MainActor
     static func reseedIfIncomplete(for child: Child, in modelContext: ModelContext) {
-        let existingTitles = Set(child.milestones.filter { !$0.isUserCreated }.map(\.title))
-        let missing = allMilestones.filter { !existingTitles.contains($0.title) }
+        let standard = child.milestones.filter { !$0.isUserCreated }
+
+        // Keyed on title *and* age. Title alone was ambiguous the moment the
+        // catalog could hold the same wording in two bands; the pair is what
+        // actually identifies a row.
+        let existingKeys = Set(standard.map(identity))
+        let missing = allMilestones.filter { !existingKeys.contains(identity($0)) }
         guard !missing.isEmpty else { return }
+
+        // Work out what the child never had a chance at *before* inserting,
+        // while their existing bands still describe the catalog they grew up on.
+        let excluded = CatalogBaseline.bandsToExclude(
+            inserting: missing,
+            existingBands: Set(standard.map(\.ageMonth)),
+            correctedAge: max(0, child.calculateCorrectedAge())
+        )
 
         for milestone in missing {
             milestone.child = child
             modelContext.insert(milestone)
         }
+
+        CatalogBaseline.record(excluded, for: child.id)
 
         do {
             try modelContext.save()
@@ -61,6 +87,64 @@ struct DataSeeder {
             sproutlyLog("Failed to repair seeded milestones — \(error.localizedDescription)")
         }
     }
+
+    // Identity of a catalog row: the wording plus the band it belongs to.
+    private static func identity(_ milestone: Milestone) -> String {
+        "\(milestone.ageMonth)|\(milestone.title)"
+    }
+
+    // MARK: - 2 Months
+
+    // Nine rather than ten. Fine motor at eight weeks is genuinely one
+    // observation — hands opening out of the newborn fist — and a second would
+    // have had to be invented. Every line here is written for a parent who is
+    // eight weeks postpartum and exhausted: these are things to enjoy noticing,
+    // and not one of them is phrased as something to check for.
+    private static var twoMonth: [Milestone] { [
+        Milestone(title: "Lifts head briefly during tummy time", category: "Gross Motor", ageMonth: 2,
+                  tips: "A few seconds is plenty at this age. Short and often works better than long stretches."),
+        Milestone(title: "Moves both arms and both legs", category: "Gross Motor", ageMonth: 2,
+                  tips: "All that kicking and waving is how they're finding out where their body ends."),
+        Milestone(title: "Opens and closes their hands", category: "Fine Motor", ageMonth: 2,
+                  tips: "Those tight newborn fists are starting to unfurl. Let them grip your finger."),
+        Milestone(title: "Makes sounds other than crying", category: "Language", ageMonth: 2,
+                  tips: "Little gurgles and sighs are their first go at talking. Answer them and they'll carry on."),
+        Milestone(title: "Reacts to loud sounds", category: "Language", ageMonth: 2,
+                  tips: "A startle, a blink, a pause mid-feed — all of it counts as hearing you."),
+        Milestone(title: "Watches you as you move", category: "Cognitive", ageMonth: 2,
+                  tips: "Your face is still their favourite thing in the room. Move slowly and let them follow."),
+        Milestone(title: "Looks at a toy for several seconds", category: "Cognitive", ageMonth: 2,
+                  tips: "High contrast holds their attention best right now — black, white, and bold shapes."),
+        Milestone(title: "Smiles when you talk or smile at them", category: "Social-Emotional", ageMonth: 2,
+                  tips: "The first real smile back is one of the great moments. It's worth writing down."),
+        Milestone(title: "Calms when comforted or picked up", category: "Social-Emotional", ageMonth: 2,
+                  tips: "Settling in your arms is them learning that you come when they need you."),
+    ] }
+
+    // MARK: - 4 Months
+
+    private static var fourMonth: [Milestone] { [
+        Milestone(title: "Holds head steady without support", category: "Gross Motor", ageMonth: 4,
+                  tips: "Steadier every week. Carrying them upright gives them a much better view."),
+        Milestone(title: "Pushes up on elbows during tummy time", category: "Gross Motor", ageMonth: 4,
+                  tips: "Propping up on their forearms is the groundwork for rolling and sitting later on."),
+        Milestone(title: "Holds a toy placed in their hand", category: "Fine Motor", ageMonth: 4,
+                  tips: "Light rattles are easiest to hang on to. Expect it to end up in their mouth."),
+        Milestone(title: "Brings hands to mouth", category: "Fine Motor", ageMonth: 4,
+                  tips: "Hands to mouth is how they self-soothe and explore at the same time."),
+        Milestone(title: "Makes cooing sounds", category: "Language", ageMonth: 4,
+                  tips: "Long soft vowels — ooh, aah. Coo back and you'll often get a reply."),
+        Milestone(title: "Turns toward the sound of your voice", category: "Language", ageMonth: 4,
+                  tips: "They know your voice from across the room. Talking as you move around is enough."),
+        Milestone(title: "Looks at their own hands with interest", category: "Cognitive", ageMonth: 4,
+                  tips: "Discovering their hands belong to them is a genuinely big idea."),
+        Milestone(title: "Opens mouth for the bottle or breast when hungry", category: "Cognitive", ageMonth: 4,
+                  tips: "Recognising what's coming before it arrives shows they're joining the dots."),
+        Milestone(title: "Smiles on their own to get your attention", category: "Social-Emotional", ageMonth: 4,
+                  tips: "A smile aimed at you, on purpose, to start something. That's a conversation."),
+        Milestone(title: "Chuckles when you try to make them laugh", category: "Social-Emotional", ageMonth: 4,
+                  tips: "Not a full belly laugh yet. Find the thing that works and you'll be doing it all week."),
+    ] }
 
     // MARK: - 6 Months
 
@@ -137,6 +221,40 @@ struct DataSeeder {
                   tips: "Separation distress means a strong bond. Brief, calm goodbyes help."),
     ] }
 
+    // MARK: - 15 Months
+
+    // The CDC's own fifteen-month list overlaps heavily with bands Sproutly
+    // already ships — its walking, stacking and "uses things the right way"
+    // entries are already covered at twelve and eighteen months. Repeating them
+    // here would ask a parent the same question twice in two places. The items
+    // below are the CDC ones that do not collide, filled out with standard
+    // fifteen-month observations from general pediatric practice (stooping and
+    // recovering, walking backward, drinking from an open cup, pointing to a
+    // body part, lids on and off). Nothing here comes from a proprietary
+    // developmental framework.
+    private static var fifteenMonth: [Milestone] { [
+        Milestone(title: "Stoops down and stands back up", category: "Gross Motor", ageMonth: 15,
+                  tips: "Squatting to pick something up and getting back up unaided takes real balance."),
+        Milestone(title: "Walks backward a few steps", category: "Gross Motor", ageMonth: 15,
+                  tips: "Often discovered by accident while pulling a toy along behind them."),
+        Milestone(title: "Uses fingers to feed themselves", category: "Fine Motor", ageMonth: 15,
+                  tips: "Messy is the point. Soft pieces they can pick up one at a time work best."),
+        Milestone(title: "Drinks from an open cup with help", category: "Fine Motor", ageMonth: 15,
+                  tips: "A small cup and a little water. Expect spills for a good while yet."),
+        Milestone(title: "Tries a word or two beyond 'mama' and 'dada'", category: "Language", ageMonth: 15,
+                  tips: "Their version counts — 'ba' for ball is a word if they mean it."),
+        Milestone(title: "Points to ask for something or for help", category: "Language", ageMonth: 15,
+                  tips: "Pointing to get something is different from pointing to show you. Both matter."),
+        Milestone(title: "Points to one body part when you ask", category: "Cognitive", ageMonth: 15,
+                  tips: "Noses and tummies are usually first. It works best as a game, not a quiz."),
+        Milestone(title: "Puts a lid on and takes it off again", category: "Cognitive", ageMonth: 15,
+                  tips: "Containers and lids will hold their attention longer than most toys."),
+        Milestone(title: "Claps when excited", category: "Social-Emotional", ageMonth: 15,
+                  tips: "Clapping at their own achievements means they've noticed them too."),
+        Milestone(title: "Shows you an object they like", category: "Social-Emotional", ageMonth: 15,
+                  tips: "Bringing something over just to share it with you is real back-and-forth."),
+    ] }
+
     // MARK: - 18 Months
 
     private static var eighteenMonth: [Milestone] { [
@@ -185,6 +303,37 @@ struct DataSeeder {
                   tips: "Parallel play looks like they're ignoring each other. They're not."),
         Milestone(title: "Copies others, especially adults", category: "Social-Emotional", ageMonth: 24,
                   tips: "Imitation is how they learn social behavior. You are their most important model."),
+    ] }
+
+    // MARK: - 30 Months
+
+    // Same overlap problem as fifteen months: the CDC's thirty-month list
+    // repeats two-word phrases, book pointing, two-step instructions, parallel
+    // play and pretend play, all of which Sproutly already asks about at
+    // eighteen or twenty-four months. What is left is the genuinely new
+    // thirty-month material, plus a stairs item and a spoon item that no
+    // existing band covers.
+    private static var thirtyMonth: [Milestone] { [
+        Milestone(title: "Jumps with both feet off the ground", category: "Gross Motor", ageMonth: 30,
+                  tips: "Both feet leaving at once is harder than it looks. Off a low step is a good start."),
+        Milestone(title: "Walks up stairs with both feet on each step", category: "Gross Motor", ageMonth: 30,
+                  tips: "One hand on the rail, both feet meeting on each step. Alternating comes later."),
+        Milestone(title: "Takes some clothes off by themselves", category: "Fine Motor", ageMonth: 30,
+                  tips: "Socks and hats go first. Getting them off is much easier than getting them on."),
+        Milestone(title: "Uses a spoon with little spilling", category: "Fine Motor", ageMonth: 30,
+                  tips: "Thicker foods stay on the spoon better while they're getting the hang of it."),
+        Milestone(title: "Says about 50 words", category: "Language", ageMonth: 30,
+                  tips: "Nobody counts exactly. If new words keep turning up, that's the thing to notice."),
+        Milestone(title: "Uses words like 'I', 'me' and 'we'", category: "Language", ageMonth: 30,
+                  tips: "Working out that they are 'I' and you are 'you' is a surprisingly big leap."),
+        Milestone(title: "Knows at least one colour", category: "Cognitive", ageMonth: 30,
+                  tips: "Usually one favourite first, applied to everything. Naming colours as you go along helps."),
+        Milestone(title: "Works out simple problems on their own", category: "Cognitive", ageMonth: 30,
+                  tips: "Standing on something to reach higher counts. Give it a moment before stepping in."),
+        Milestone(title: "Shows you what they can do — 'look at me!'", category: "Social-Emotional", ageMonth: 30,
+                  tips: "Wanting an audience for something they've managed is new, and worth giving them."),
+        Milestone(title: "Follows simple routines when told", category: "Social-Emotional", ageMonth: 30,
+                  tips: "Helping tidy up or coming for a bath when asked. It won't be every time."),
     ] }
 
     // MARK: - 36 Months (3 Years)

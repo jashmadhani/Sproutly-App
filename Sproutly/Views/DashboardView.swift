@@ -48,11 +48,21 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: Theme.sectionSpacing) {
                     headerCard
-                    progressCard
-                    if viewModel.hasDevelopmentFocus {
-                        developmentFocusCard
+
+                    // A baby younger than the first band Sproutly covers has
+                    // nothing to show in a ring, and rendering one at zero — or
+                    // five domain tiles reading 0/24 — would state an absence
+                    // where there is simply a start date. See A.4.
+                    if viewModel.hasReachedFirstBand {
+                        progressCard
+                        if viewModel.hasDevelopmentFocus {
+                            developmentFocusCard
+                        }
+                        categoryOverview
+                    } else {
+                        comingSoonCard
                     }
-                    categoryOverview
+
                     recentMomentsCard
                     screeningCards
                     growthInsightsSection
@@ -234,6 +244,67 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Milestone progress")
         .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones completed for \(viewModel.targetAgeMonth) months")
+    }
+
+    // MARK: - Before the First Band
+
+    // Shown instead of the ring for a baby younger than two months corrected.
+    //
+    // Every word here was chosen against one test: a parent three weeks into
+    // this should close the app feeling that nothing is missing. So there is no
+    // count, no ring, no progress of any kind — only a start date stated plainly
+    // and a look at what they will get to notice soon.
+    private var comingSoonCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sproutly starts at \(viewModel.upcomingBandMonth) months")
+                    .font(Theme.sproutlySectionHeader)
+                    .foregroundStyle(theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("There's nothing here to save yet, and that's exactly right. Around \(viewModel.upcomingBandMonth) months you'll start noticing things like these.")
+                    .font(Theme.sproutlyBody)
+                    .foregroundStyle(theme.textSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !viewModel.upcomingMilestones.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.itemSpacing) {
+                    ForEach(viewModel.upcomingMilestones.prefix(3)) { milestone in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: milestone.categoryType.icon)
+                                .sproutlyScaledFont(15, relativeTo: .subheadline)
+                                .foregroundStyle(milestone.categoryType.color(for: theme.isNightMode))
+                                .frame(width: 22)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(milestone.title)
+                                    .font(Theme.sproutlyItemTitle)
+                                    .foregroundStyle(theme.text)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                Text(milestone.categoryType.gentleLabel)
+                                    .font(Theme.sproutlyMeta)
+                                    .foregroundStyle(theme.textSecondary)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Theme.milestoneRowFill(for: theme.isNightMode))
+                        )
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .warmCard(nightMode: theme.isNightMode)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Sproutly starts at \(viewModel.upcomingBandMonth) months")
+        .accessibilityValue("A look at what you'll start noticing around \(viewModel.upcomingBandMonth) months")
     }
 
     // The ring's count and label. Declared once and placed either inside the
