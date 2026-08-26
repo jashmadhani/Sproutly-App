@@ -63,14 +63,14 @@ struct ScreeningCardView: View {
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
                     
                     if isOverdue {
-                        Text("Past due")
+                        Text("Still worth doing")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(Theme.encourageYellowText(for: nightMode))
                     }
                 }
                 
                 Text(isOverdue
-                     ? "Worth discussing at your next visit — it's never too late to bring this up with your pediatrician."
+                     ? "Worth raising at your next visit. It is never too late to bring this up with your pediatrician."
                      : screening.body)
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
@@ -89,7 +89,7 @@ struct ScreeningCardView: View {
         .opacity(isOverdue ? 0.85 : 1.0)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isOverdue
-            ? "Past due: \(screening.title). Worth discussing at your next visit."
+            ? "\(screening.title). Still worth doing, and worth raising at your next visit."
             : screening.title)
     }
 }

@@ -369,7 +369,7 @@ enum NotificationPlanner {
             kind: .weeklyReflection,
             childID: childID,
             fireDate: fire,
-            title: "A quiet moment to look back on \(childName)'s week",
+            title: "Look back on \(childName)'s week",
             body: "Here's what you noticed.",
             photoFilename: nil
         )

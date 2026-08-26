@@ -144,7 +144,7 @@ struct PaywallView: View {
                         // literal, and never a fallback figure when the product
                         // hasn't resolved — the branch above shows a spinner instead.
                         HStack(spacing: 10) {
-                            Text("Unlock everything")
+                            Text("Get Sproutly Pro")
                                 .font(.headline)
                                 .foregroundStyle(.white.opacity(0.94))
 
@@ -181,7 +181,7 @@ struct PaywallView: View {
             .buttonStyle(.plain)
             .disabled(purchases.state == .purchasing || (purchases.product == nil && !loadFailed))
 
-            Text("One payment, yours forever. No subscription.")
+            Text("One payment. No subscription.")
                 .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
 
@@ -234,17 +234,17 @@ enum PaywallReason: Identifiable {
     var headline: String {
         switch self {
         case .secondChild:
-            return "Track a second child, with their own milestones and their own story."
+            return "Keep a second child, with their own milestones."
         case .photo:
-            return "Keep a photo with every milestone you record."
+            return "Keep a photo with every milestone you save."
         case .report:
             return "Bring a clear summary to your next pediatrician visit."
         case .shareCard:
-            return "Share this moment with the people who love them."
+            return "Make a simple card to send to family."
         case .customMilestone:
-            return "Record your own moments, not just the standard ones."
+            return "Save your own moments, not just the ones in the list."
         case .appIcon:
-            return "Choose the Sproutly icon that feels like yours."
+            return "Choose the Sproutly icon you want on your Home Screen."
         }
     }
 
@@ -258,7 +258,7 @@ enum PaywallReason: Identifiable {
         Feature(
             icon: "figure.2.and.child.holdinghands",
             title: "Every child",
-            detail: "Siblings and twins, each tracked separately"
+            detail: "Siblings and twins, each kept separately"
         ),
         Feature(
             icon: "photo",
@@ -272,18 +272,18 @@ enum PaywallReason: Identifiable {
         ),
         Feature(
             icon: "square.and.arrow.up",
-            title: "Shareable moments",
-            detail: "Cards for family and friends"
+            title: "Share cards",
+            detail: "Make a simple card to send to family"
         ),
         Feature(
             icon: "heart",
             title: "Your own moments",
-            detail: "Record anything, at any age"
+            detail: "Save anything, at any age"
         ),
         Feature(
             icon: "app.badge",
             title: "Choose your app icon",
-            detail: "Five looks, including one for siblings"
+            detail: "Five icons, including one for siblings"
         )
     ]
 }

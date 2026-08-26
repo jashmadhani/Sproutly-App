@@ -48,12 +48,12 @@ struct ReportDocumentView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.black)
 
-            Text("\(report.childName) · \(report.ageText)")
+            Text("\(report.childName), \(report.ageText)")
                 .font(.system(size: 14))
                 .foregroundStyle(.black)
 
             if report.isPremature {
-                Text("Born at \(report.gestationalWeeks) weeks · ages shown are corrected")
+                Text("Born at \(report.gestationalWeeks) weeks. Ages shown are corrected.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -70,7 +70,7 @@ struct ReportDocumentView: View {
     }
 
     private var summary: some View {
-        Text("\(report.totalCompleted) of \(report.totalExpected) milestones observed for this age.")
+        Text("You have saved \(report.totalCompleted) of \(report.totalExpected) milestones listed for this age.")
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(.black)
     }
@@ -86,7 +86,7 @@ struct ReportDocumentView: View {
             }
 
             ForEach(section.pending) { milestone in
-                row(milestone.title, marker: "○", dimmed: true, detail: "expected ~\(milestone.expectedAgeText)")
+                row(milestone.title, marker: "○", dimmed: true, detail: "usually looked for around \(milestone.expectedAgeText)")
             }
         }
     }
@@ -97,7 +97,7 @@ struct ReportDocumentView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.black)
 
-            Text("Not yet observed, and typically expected some time ago:")
+            Text("Not saved yet. These are commonly looked for earlier.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
@@ -106,7 +106,7 @@ struct ReportDocumentView: View {
                     milestone.title,
                     marker: "•",
                     dimmed: false,
-                    detail: "\(milestone.categoryType.gentleLabel) · expected ~\(milestone.expectedAgeText)"
+                    detail: "\(milestone.categoryType.gentleLabel), usually looked for around \(milestone.expectedAgeText)"
                 )
             }
         }
@@ -147,7 +147,7 @@ struct ReportDocumentView: View {
         if !milestone.completionNote.isEmpty {
             parts.append("\"\(milestone.completionNote)\"")
         }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 
     private func row(_ title: String, marker: String, dimmed: Bool, detail: String) -> some View {

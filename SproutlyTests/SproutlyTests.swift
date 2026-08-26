@@ -1049,7 +1049,7 @@ final class BackfillTests: XCTestCase {
         let dated = Date(timeIntervalSince1970: 1_700_000_000)
 
         let withDate = MilestoneShareCard.caption(childName: "Aanya", dateCompleted: dated)
-        XCTAssertTrue(withDate.hasPrefix("Aanya · "))
+        XCTAssertTrue(withDate.hasPrefix("Aanya, "))
         XCTAssertTrue(withDate.contains(dated.formatted(date: .long, time: .omitted)))
 
         let withoutDate = MilestoneShareCard.caption(childName: "Aanya", dateCompleted: nil)
@@ -2043,8 +2043,8 @@ final class UIRegressionTests: XCTestCase {
 
     // A blank or whitespace-only name must never reach a Child.
     func testWhitespaceOnlyNameFallsBackRatherThanRenderingEmpty() {
-        XCTAssertEqual(Child(name: "   ", birthDate: Date()).displayName, "Your little one")
-        XCTAssertEqual(Child(name: "", birthDate: Date()).displayName, "Your little one")
+        XCTAssertEqual(Child(name: "   ", birthDate: Date()).displayName, "Your child")
+        XCTAssertEqual(Child(name: "", birthDate: Date()).displayName, "Your child")
         XCTAssertEqual(Child(name: " Aanya ", birthDate: Date()).displayName, "Aanya")
     }
 

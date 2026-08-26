@@ -68,9 +68,9 @@ struct GrowthInsightsView: View {
                 icon: "eye.fill",
                 title: "What you notice, and what a doctor checks",
                 body: """
-                    Watching how your child grows, day to day, is something you already do. Sproutly is just somewhere to keep it.
+                    You already notice how your child is growing day to day. Sproutly helps you keep those observations in one place.
 
-                    Developmental screening uses brief, standardized tools at specific ages (9, 18, and 30 months) to check whether development is on track. Your pediatrician handles these.
+                    Screening is the other half, and it belongs to your pediatrician. They use short, standard checks at set ages (9, 18, and 30 months) to see how things are going.
 
                     The two work together. What you notice at home gives your pediatrician useful context.
                     """
@@ -85,7 +85,7 @@ struct GrowthInsightsView: View {
 
                     If something does come up, early support programs can help, and you don't need a diagnosis to be referred. They work through ordinary things: play, meals, bath time.
 
-                    It isn't about labels. It's about giving your child a good start.
+                    It isn't about labels. It's about asking the question early, while there is plenty of time to act on the answer.
                     """
             )
 
@@ -96,11 +96,11 @@ struct GrowthInsightsView: View {
                 body: """
                     Trust your instincts. You know your child best. Some situations where a conversation with your pediatrician can be helpful:
 
-                    • If speech development seems slower than expected, a hearing screening can rule out simple causes
-                    • If you notice differences in social engagement, early evaluation can open doors to support
+                    • If speech is slower to arrive than you expected, a hearing check can rule out simple causes
+                    • If your child seems less interested in other people than you'd expect, an early look can open doors to support
                     • Any time you're unsure. Pediatricians welcome these questions
 
-                    Well-child visits are a good time to bring these up.
+                    Well-child visits are a good time to bring these up, and you don't have to wait for one.
                     """
             )
         }

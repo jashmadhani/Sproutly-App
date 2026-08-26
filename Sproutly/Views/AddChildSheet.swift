@@ -36,7 +36,7 @@ struct AddChildSheet: View {
                     VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                         VStack(alignment: .leading, spacing: 16) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("What do you call your little one?")
+                                Text("What do you call your child?")
                                     .font(Theme.sproutlyFieldLabel)
                                     .foregroundStyle(theme.textSecondary)
 
@@ -102,7 +102,7 @@ struct AddChildSheet: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Toggle(isOn: $isPremature) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Did your baby arrive early?")
+                                    Text("Was your child born early?")
                                         .font(Theme.sproutlyCardTitle)
                                         .foregroundStyle(theme.text)
                                     Text("Before 37 weeks. We'll take that into account when showing milestones.")

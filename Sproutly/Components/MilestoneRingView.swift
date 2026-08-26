@@ -54,7 +54,7 @@ struct MilestoneRingView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Milestone progress ring")
-        .accessibilityValue("\(completedCount) of \(totalCount) milestones completed")
+        .accessibilityValue("\(completedCount) of \(totalCount) milestones saved")
         .onAppear {
             withAnimation(.easeOut(duration: 0.6)) {
                 animatedProgress = progress

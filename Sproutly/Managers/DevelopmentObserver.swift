@@ -38,10 +38,10 @@ enum DomainStatus: String, CaseIterable {
 
     var supportiveMessage: String {
         switch self {
-        case .onTrack:        return "Growing beautifully"
-        case .emerging:       return "Growth unfolds at its own pace"
-        case .needsSupport:   return "A little extra encouragement helps"
-        case .worthDiscussing: return "Consider discussing at your next visit"
+        case .onTrack:        return "Plenty saved for this age"
+        case .emerging:       return "Some of this is saved so far"
+        case .needsSupport:   return "Not much saved here yet"
+        case .worthDiscussing: return "Worth raising at your next visit"
         }
     }
 }

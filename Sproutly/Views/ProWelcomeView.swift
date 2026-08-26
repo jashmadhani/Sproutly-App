@@ -36,7 +36,7 @@ struct ProWelcomeView: View {
                             .font(.sproutlyDisplay(30))
                             .foregroundStyle(theme.text)
 
-                        Text("Sproutly Pro is unlocked. Here's what's new.")
+                        Text("Sproutly Pro is unlocked. Here is what it adds.")
                             .font(Theme.sproutlyBody)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.textSecondary)
@@ -47,7 +47,7 @@ struct ProWelcomeView: View {
 
                     // Tells a parent exactly where to come back to this list —
                     // otherwise this sheet is the only place they ever see it.
-                    Text("Find this again anytime in Settings → Pro Features.")
+                    Text("Find this again in Settings, under Pro Features.")
                         .font(Theme.sproutlyMeta)
                         .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)

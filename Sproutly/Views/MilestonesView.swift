@@ -14,7 +14,7 @@ import PhotosUI
 enum MilestoneFilter: String, CaseIterable {
     case thisStage = "This Stage"
     case all = "All"
-    case completed = "Completed"
+    case completed = "Saved"
 }
 
 // MARK: - Milestones View
@@ -185,7 +185,7 @@ struct MilestonesView: View {
                 }
             }
         }
-        .alert("Remove Milestone?", isPresented: $showRemoveAlert, presenting: milestoneToUncheck) { milestone in
+        .alert("Remove this from your saved moments?", isPresented: $showRemoveAlert, presenting: milestoneToUncheck) { milestone in
             Button("Cancel", role: .cancel) { milestoneToUncheck = nil }
             Button("Remove", role: .destructive) {
                 milestone.isCompleted = false
@@ -197,9 +197,9 @@ struct MilestonesView: View {
                 milestoneToUncheck = nil
             }
         } message: { _ in
-            Text("This will delete your saved memory, including any photo.")
+            Text("This removes the saved moment and any photo attached to it.")
         }
-        .alert("Delete this moment?", isPresented: $showDeleteMilestoneAlert, presenting: milestoneToDelete) { milestone in
+        .alert("Delete this saved moment?", isPresented: $showDeleteMilestoneAlert, presenting: milestoneToDelete) { milestone in
             Button("Cancel", role: .cancel) { milestoneToDelete = nil }
             Button("Delete", role: .destructive) {
                 PhotoStore.delete(milestone.photoFilename)
@@ -223,7 +223,7 @@ struct MilestonesView: View {
 
                 // Naming the child here is what stops a parent logging against the
                 // wrong one after switching.
-                Text("\(child.displayName) · \(ageDescription)")
+                Text("\(child.displayName), \(ageDescription)")
                     .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
             }
@@ -287,7 +287,7 @@ struct MilestonesView: View {
                 ? "\(years) year\(years == 1 ? "" : "s")"
                 : "\(years)y \(rem)m"
         }
-        return child.isPremature ? "\(base) · adjusted for arriving early" : base
+        return child.isPremature ? "\(base), adjusted for arriving early" : base
     }
 
     // MARK: - Filter Picker
@@ -433,7 +433,7 @@ struct MilestonesView: View {
             if isExpanded {
                 VStack(spacing: Theme.itemSpacing) {
                     if milestones.isEmpty {
-                        Text("Nothing here yet.")
+                        Text("Nothing saved here yet.")
                             .font(Theme.sproutlyBody)
                             .foregroundStyle(theme.textSecondary)
                             .padding(.horizontal, 16)
@@ -481,7 +481,7 @@ struct MilestonesView: View {
                 // "Your moment" label instead of a clinical age band. Same row
                 // styling otherwise — these are not a separate kind of thing.
                 if milestone.isUserCreated {
-                    Label("Your moment", systemImage: "heart.fill")
+                    Label("Saved by you", systemImage: "heart.fill")
                         .font(Theme.sproutlyMeta)
                         .foregroundStyle(theme.blue.opacity(0.8))
                 } else {
@@ -557,7 +557,7 @@ struct MilestonesView: View {
                     milestoneToDelete = milestone
                     showDeleteMilestoneAlert = true
                 } label: {
-                    Label("Delete Moment", systemImage: "trash")
+                    Label("Delete saved moment", systemImage: "trash")
                 }
             }
         }
@@ -573,7 +573,7 @@ struct MilestonesView: View {
 
             Text(selectedFilter == .completed
                  ? "Nothing saved yet.\nTap the circle beside a milestone when you notice it."
-                 : "No milestones available.")
+                 : "Nothing to show here yet.")
                 .font(.subheadline)
                 .foregroundStyle(theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -611,7 +611,7 @@ struct MilestonesView: View {
                 TextField(
                     "",
                     text: $noteText,
-                    prompt: Text("What made it special? (optional)")
+                    prompt: Text("Anything you want to remember? (optional)")
                         .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode)),
                     axis: .vertical
                 )

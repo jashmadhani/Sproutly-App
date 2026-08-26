@@ -218,7 +218,7 @@ struct ContentView: View {
         .alert("Starting Fresh", isPresented: $showStoreRecoveryNotice) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Sproutly couldn't open its saved data on this device, so it started a new library. A backup copy of the old one is kept on this device — please reach out before reinstalling if you'd like help recovering it.")
+            Text("Sproutly could not open its saved data on this device, so it started a new library. A backup copy of the old one is kept on this device. Please get in touch before reinstalling if you would like help recovering it.")
         }
         .task {
             guard !hasImported else { return }

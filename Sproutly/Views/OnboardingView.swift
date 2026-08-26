@@ -201,11 +201,11 @@ private extension OnboardingView {
                     .foregroundStyle(theme.text)
 
                 VStack(spacing: 8) {
-                    Text("Every small moment matters")
+                    Text("Keep the things you notice")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
 
-                    Text("Keep track of the small things your child does,\nso you can look back on them later.")
+                    Text("Save what you notice now. It is useful later,\nwhen you look back or talk with your pediatrician.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
@@ -234,24 +234,24 @@ private extension OnboardingView {
                 howItWorksRow(
                     icon: "eye",
                     title: "Notice",
-                    subtitle: "The small things your child does each day"
+                    subtitle: "What your child is doing day to day"
                 )
 
                 howItWorksRow(
                     icon: "square.and.pencil",
                     title: "Save",
-                    subtitle: "One tap saves it. That's the whole thing."
+                    subtitle: "Tap once to save what you noticed"
                 )
 
                 howItWorksRow(
                     icon: "heart.text.square",
                     title: "Look back",
-                    subtitle: "See how much has changed since last month."
+                    subtitle: "See what you have saved over time"
                 )
             }
             .padding(.horizontal, 24)
 
-            Text("Notice it. Save it. Come back to it.")
+            Text("Notice something. Save it. Find it again later.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -281,7 +281,7 @@ private extension OnboardingView {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.text)
 
-                Text("Every child gets there in their own time.\nSproutly is here to help you keep track,\nnot to score or compare.")
+                Text("Children get there at different ages.\nSproutly keeps track of what you notice.\nIt does not score or compare.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(theme.textSecondary)
@@ -360,7 +360,7 @@ private extension OnboardingView {
                             .foregroundStyle(theme.blue)
                     }
 
-                    Text("About Your Little One")
+                    Text("About Your Child")
                         .font(.sproutlyDisplay(26))
                         .foregroundStyle(theme.text)
                 }
@@ -371,7 +371,7 @@ private extension OnboardingView {
                     // control, so a container of ours around them only ever
                     // produced a box inside a box.
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("What do you call your little one?")
+                        Text("What do you call your child?")
                             .font(Theme.sproutlyFieldLabel)
                             .foregroundStyle(theme.textSecondary)
 
@@ -407,7 +407,7 @@ private extension OnboardingView {
 
                     Toggle(isOn: $isPremature) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Did your baby arrive early?")
+                            Text("Was your child born early?")
                                 .font(Theme.sproutlyFieldValue)
                                 .foregroundStyle(theme.text)
                             Text("Before 37 weeks. We'll take that into account when showing milestones.")
@@ -452,7 +452,7 @@ private extension OnboardingView {
     // Step 6: What they already do. Only reached when the list is non-empty.
     var backfillStep: some View {
         OnboardingBackfillStep(
-            childName: trimmedName.isEmpty ? "your little one" : trimmedName,
+            childName: trimmedName.isEmpty ? "your child" : trimmedName,
             candidates: backfillCandidates,
             selection: $backfillSelection
         )

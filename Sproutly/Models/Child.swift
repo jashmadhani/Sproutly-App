@@ -144,7 +144,7 @@ final class Child {
     // First name only, for headers where space is tight.
     var displayName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Your little one" : trimmed
+        return trimmed.isEmpty ? "Your child" : trimmed
     }
 
     var initial: String {

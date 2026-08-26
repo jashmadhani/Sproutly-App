@@ -84,7 +84,7 @@ struct AssistantView: View {
                 .font(.sproutlyDisplay(30))
                 .foregroundStyle(theme.text)
 
-            Text("Ask anything about your child's growth")
+            Text("Ask about anything you have noticed")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
         }

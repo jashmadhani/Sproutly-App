@@ -709,11 +709,11 @@ enum Theme {
     // MARK: - Celebration Microcopy
     
     static let celebrationMessages: [String] = [
-        "You noticed something wonderful today ✨",
-        "Growth is happening 🌱",
-        "A beautiful moment, captured 💛",
-        "Every little step matters 🌿",
-        "What a gentle discovery ✨"
+        "Noticed and saved.",
+        "Saved. Good one to have written down.",
+        "That is in there now.",
+        "Saved. You can look back at this any time.",
+        "Saved."
     ]
     
     static func randomCelebration() -> String {
@@ -725,10 +725,10 @@ enum Theme {
     static func lateMilestoneMessage(ageMonth: Int) -> String {
         let rangeStart = max(0, ageMonth - 1)
         let rangeEnd = ageMonth + 2
-        return "Most children explore this skill between \(rangeStart)–\(rangeEnd) months. If you haven't noticed it yet, that's okay. Here are a few gentle activities you can try."
+        return "Most children start doing this between \(rangeStart) and \(rangeEnd) months. If you haven't noticed it yet, that's okay. Here are a few things you can try."
     }
     
-    static let pediatricianReassurance = "If you're ever unsure, your pediatrician can offer reassurance."
+    static let pediatricianReassurance = "If you are unsure about anything, ask your pediatrician."
 }
 
 // MARK: - Color Hex Initializer

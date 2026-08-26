@@ -170,7 +170,7 @@ struct SettingsView: View {
                 .font(.sproutlyDisplay(30))
                 .foregroundStyle(theme.text)
             
-            Text("Adjust your experience")
+            Text("Make Sproutly work the way you like.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
         }
@@ -184,13 +184,13 @@ struct SettingsView: View {
         
         return FeatureCardHeader(
             title: "Night Mode",
-            subtitle: "Reduce brightness for quiet evenings",
+            subtitle: "Makes the app darker for evening use",
             systemImage: theme.isNightMode ? "moon.stars.fill" : "moon.fill",
             nightMode: theme.isNightMode
         ) {
             SproutlySwitch(isOn: $tm.isNightMode, nightMode: theme.isNightMode)
                 .accessibilityLabel("Night Mode")
-                .accessibilityHint("Reduce brightness for quiet evenings")
+                .accessibilityHint("Makes the app darker for evening use")
         }
         .warmCard(nightMode: theme.isNightMode)
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
@@ -217,7 +217,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             fieldLabel("Sproutly Pro", systemImage: "star.fill", tint: theme.proGoldText)
 
-            Text("One payment, yours forever.")
+            Text("One payment. No subscription.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -268,7 +268,7 @@ struct SettingsView: View {
             // does. The previous version invented a fourth card idiom for this
             // screen, with its own padding and four shrinking type sizes.
             FeatureCardHeader(
-                title: "Gentle reminders",
+                title: "Reminders",
                 subtitle: "At most one a day, in the morning",
                 systemImage: "bell.fill",
                 nightMode: theme.isNightMode
@@ -282,7 +282,7 @@ struct SettingsView: View {
                     ),
                     nightMode: theme.isNightMode
                 )
-                .accessibilityLabel("Gentle reminders")
+                .accessibilityLabel("Reminders")
                 .accessibilityHint("At most one a day, in the morning")
             }
 
@@ -323,7 +323,7 @@ struct SettingsView: View {
             Theme.divider(nightMode: theme.isNightMode)
 
             // D.3, once, at the same weight as every other footnote.
-            Text("These are reminders to look and remember. They aren't medical guidance, and they aren't an assessment of your child.")
+            Text("These are reminders to look and remember. They are not medical guidance, and they are not an assessment of your child.")
                 .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -485,7 +485,7 @@ struct SettingsView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Adds another child with their own milestones")
+            .accessibilityHint("Adds another child with a separate milestone list")
         }
         .warmCard(nightMode: theme.isNightMode)
     }
@@ -500,7 +500,7 @@ struct SettingsView: View {
             
             // Name
             VStack(alignment: .leading, spacing: 8) {
-                Text("What do you call your little one?")
+                Text("What do you call your child?")
                     .font(Theme.sproutlyFieldLabel)
                     .foregroundStyle(theme.textSecondary)
                 
@@ -555,7 +555,7 @@ struct SettingsView: View {
             
             Toggle(isOn: $profile.isPremature) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Did your baby arrive early?")
+                    Text("Was your child born early?")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Text("Before 37 weeks. We'll take that into account when showing milestones.")
@@ -769,7 +769,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset Milestone Progress")
-            .accessibilityHint("Clears everything saved for this child, keeps their profile")
+            .accessibilityHint("Removes saved progress for this child but keeps their profile")
 
             rowDivider
 
@@ -785,7 +785,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Delete All Data")
-            .accessibilityHint("Removes all data and returns to welcome screen")
+            .accessibilityHint("Deletes all children and saved moments, then returns to the welcome screen")
         }
         .groupedCard(nightMode: theme.isNightMode)
     }

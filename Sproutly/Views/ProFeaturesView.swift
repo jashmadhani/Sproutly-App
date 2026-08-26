@@ -52,7 +52,7 @@ struct ProFeaturesView: View {
                 .font(.sproutlyDisplay(24))
                 .foregroundStyle(theme.text)
 
-            Text("Here's everything it unlocks, and where to find it.")
+            Text("Here is what it adds, and where to find each one.")
                 .font(Theme.sproutlyBody)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(theme.textSecondary)

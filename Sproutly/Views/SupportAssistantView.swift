@@ -27,7 +27,7 @@ struct SupportAssistantView: View {
             // than squeezing the title into a two-word column.
             FeatureCardHeader(
                 title: "Ask Sproutly",
-                subtitle: "Share a question or concern",
+                subtitle: "A few things to try, and when to ask",
                 systemImage: "sparkles",
                 nightMode: nightMode,
                 diameter: 36,
@@ -35,14 +35,14 @@ struct SupportAssistantView: View {
                 subtitleFont: Theme.sproutlyMeta
             )
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Ask Sproutly, share a question or concern")
+            .accessibilityLabel("Ask Sproutly. A few things to try, and when to ask")
             
             // Input field
             HStack(spacing: 10) {
                 TextField(
                     "",
                     text: $question,
-                    prompt: Text("What's on your mind today?")
+                    prompt: Text("What have you been wondering about?")
                         .foregroundColor(Theme.fieldPlaceholder(for: nightMode)),
                     axis: .vertical
                 )
@@ -51,7 +51,7 @@ struct SupportAssistantView: View {
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
                     .focused($isInputFocused)
                     .accessibilityLabel("Question input")
-                    .accessibilityHint("Type your question about your child's development")
+                    .accessibilityHint("Type a question about your child")
                 
                 if !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button {
@@ -76,8 +76,8 @@ struct SupportAssistantView: View {
             // Response area
             if let resp = response {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Reassurance
-                    Text(resp.reassurance)
+                    // What is ordinarily true at this age
+                    Text(resp.context)
                         .font(Theme.sproutlyBody)
                         .foregroundStyle(Theme.textPrimary(for: nightMode))
                         .fixedSize(horizontal: false, vertical: true)
@@ -85,7 +85,7 @@ struct SupportAssistantView: View {
                     // Activity suggestions
                     if !resp.activities.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Things to try:")
+                            Text("Things to try")
                                 .font(Theme.sproutlyCardTitle)
                                 .foregroundStyle(Theme.accentBlueText(for: nightMode))
 
@@ -120,7 +120,7 @@ struct SupportAssistantView: View {
                 .opacity(responseOpacity)
                 .animation(.easeInOut(duration: 0.4), value: responseOpacity)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Sproutly's response")
+                .accessibilityLabel("Answer from Sproutly")
             }
         }
         .warmCard(nightMode: nightMode)
@@ -148,7 +148,7 @@ struct SupportAssistantView: View {
 // MARK: - Assistant Response Model
 
 struct AssistantResponse {
-    let reassurance: String
+    let context: String
     let activities: [String]
     let pediatricNote: String?
 }
@@ -313,190 +313,203 @@ enum AssistantEngine {
     }
     
     // MARK: - Domain Responses
-    
+    //
+    // One shape for every response: what is ordinarily true at this age, two or
+    // three things a parent can actually do, and, when the question or the saved
+    // milestones suggest it, a plain reason to raise it at a visit. No response
+    // predicts the child, because the app has no basis for predicting.
+
     private static func grossMotorResponse(age: Int, isConcern: Bool) -> AssistantResponse {
-        var reassurances: [String] = []
+        var contexts: [String] = []
         var activities: [String] = []
-        
+
         if age < 12 {
-            reassurances = [
-                "Early movement milestones like rolling and sitting often happen in bursts. Your little one is building core strength every time they wiggle.",
-                "Babies develop mobility on their own unique timeline. Some are keen observers before they become movers.",
-                "It's completely normal for infants to focus on other skills like babbling before mastering crawling or walking."
+            contexts = [
+                "Rolling, sitting, and pushing up all draw on the same core strength, and they tend to arrive in bursts rather than steadily.",
+                "Babies usually work on one thing at a time. Some spend weeks watching before they start moving much.",
+                "Most of the movement practice at this age happens on the floor, during ordinary play."
             ]
             activities = [
-                "Tummy time is still the best way to build core strength",
-                "Place vivid toys just out of reach to encourage reaching and scooting",
-                "Let them practice sitting with support from pillows"
+                "Tummy time, a few minutes at a stretch, several times a day",
+                "Put a favorite toy just out of reach so there is a reason to stretch for it",
+                "Sit them propped with cushions so they can practice holding steady"
             ]
         } else if age < 24 {
-            reassurances = [
-                "Walking typically emerges between 9 and 18 months—a huge window of 'normal'. Your child is likely building the confidence they need.",
-                "Toddlers are learning balance, coordination, and courage all at once. Wobbly steps are a beautiful part of the process.",
-                "Gross motor skills at this age are all about exploration. Even climbing on cushions counts as practice."
+            contexts = [
+                "First steps usually land somewhere between 9 and 18 months. Cruising along furniture and standing without holding on come first.",
+                "Balance, coordination, and confidence are all being learned at once, so progress often looks uneven week to week.",
+                "Climbing onto cushions and pulling up on the sofa are practice too, even before any walking."
             ]
             activities = [
-                "Create safe obstacle courses with cushions and blankets",
-                "Practice walking while holding a toy (it distracts from the wobble!)",
-                "Push-toys or sturdy boxes can give great walking support"
+                "Clear some floor and let them cruise between the sofa and a chair",
+                "Hold a toy out so they have a reason to let go with one hand",
+                "A sturdy push toy or a weighted box gives support without doing the work for them"
             ]
         } else {
-            reassurances = [
-                "Active play looks different for every child. Some are climbers, some are runners, and some are careful observers.",
-                "Coordination keeps refining well into the school years. Running, jumping, and balancing are complex skills.",
-                "Building strength happens naturally through play. As long as they are moving, they are learning."
+            contexts = [
+                "After the first couple of years, movement is mostly about control: stopping, turning, and climbing down as well as up.",
+                "Children differ a lot here. Some are climbers, some are runners, and some watch for a while first.",
+                "Running, jumping, and balancing keep getting steadier well into the school years."
             ]
             activities = [
-                "Visit a playground to practice climbing and sliding",
-                "Play 'STOP and GO' games to practice body control",
-                "Kick a ball back and forth to build balance"
+                "A playground trip covers climbing, sliding, and balance in one go",
+                "Play stop-and-go games to practice starting and stopping on cue",
+                "Kick a ball back and forth, which needs a moment of balance on one leg"
             ]
         }
-        
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
-            pediatricNote: isConcern ? "Since you're noticing some delays in movement, a quick chat with your pediatrician can offer peace of mind and specific guidance. 💛" : nil
+            pediatricNote: isConcern
+                ? "If how your child moves is on your mind, bring it to your pediatrician. Describing what you have seen at home is the useful part."
+                : nil
         )
     }
-    
+
     private static func fineMotorResponse(age: Int, isConcern: Bool) -> AssistantResponse {
-        let reassurances = [
-            "Fine motor skills develop as hand muscles grow stronger. It's intricate work for little hands!",
-            "From grasping to drawing, hand coordination takes patience. Every attempt is brain-building.",
-            "Using hands to explore is how children learn about the physical world. Messy play is great practice."
+        let contexts = [
+            "Hand skills build in order: whole-hand grabbing first, then thumb and finger, then the finer control that drawing and buttons need.",
+            "Most of this gets practiced during eating, playing, and making a mess, rather than in anything that looks like an exercise.",
+            "Small hands tire quickly, so short attempts are normal and they still count."
         ]
-        
+
         var activities: [String] = []
         if age < 18 {
-             activities = [
-                "Offer finger foods to practice the pincer grasp",
+            activities = [
+                "Offer finger foods so they practice picking up small pieces",
                 "Let them bang blocks together or stack cups",
-                "Poke holes in playdough with fingers"
+                "Poke holes in playdough with a finger"
             ]
         } else {
-             activities = [
-                "Stringing large beads or pasta",
-                "Using tongs to pick up cotton balls",
-                "Scribbling with chunky crayons"
+            activities = [
+                "Thread large beads or dry pasta onto a string",
+                "Use tongs to move cotton balls from one bowl to another",
+                "Scribble with chunky crayons, no picture required"
             ]
         }
-        
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
-            pediatricNote: isConcern ? "Fine motor skills can sometimes benefit from simple occupational therapy tips—your pediatrician can let you know if that's helpful. 💛" : nil
+            pediatricNote: isConcern
+                ? "If hand skills are on your mind, mention it at your next visit. Your pediatrician can suggest things to try, or refer you if that would help."
+                : nil
         )
     }
-    
+
     private static func languageResponse(age: Int, isConcern: Bool) -> AssistantResponse {
-        var reassurances: [String] = []
+        var contexts: [String] = []
         var pediatric: String? = nil
-        
+
         if age < 18 {
-            reassurances = [
-                "Language starts with understanding. If they are looking when you point or responding to their name, they are communicating!",
-                "Babbling, gestures, and pointing are all 'pre-words'. They count just as much as spoken words right now.",
-                "Some children focus on motor skills first, then have a 'language explosion' later. It's a common pattern."
+            contexts = [
+                "Understanding comes before speaking. Looking when you point, turning to their name, and reaching to be picked up are all communication.",
+                "Babbling, gestures, and pointing are the groundwork for words, and they carry as much weight now as spoken words will later.",
+                "Children vary a lot in when words start. Some work on movement first and words follow in a rush."
             ]
             if isConcern {
-                pediatric = "If they aren't babbling or gesturing yet, a hearing screening is a routine first step your pediatrician might suggest. 💛"
+                pediatric = "If sounds and gestures are what you are wondering about, bring it to your pediatrician. A hearing check is a routine first step and easy to arrange."
             }
         } else {
-            reassurances = [
-                "Vocabulary grows at different rates. Combining words and following instructions are big steps, even with fewer spoken words.",
-                "Clarity of speech takes years to refine. What matters most now is the attempt to connect.",
-                "You are their best interpreter. Your back-and-forth conversations are building their brain pathways."
+            contexts = [
+                "Vocabulary grows at very different rates. Following an instruction and putting two words together are big steps, even with few spoken words.",
+                "Clear speech takes years to settle. For now, the attempt to be understood matters more than the pronunciation.",
+                "The back-and-forth is what builds language: you say something, they answer, you answer that."
             ]
             if isConcern {
-                pediatric = "Since language is so key to connection, sharing your observations with your pediatrician is a great idea. Early speech checks are supportive and common. 💛"
+                pediatric = "If speech is on your mind, bring it to your pediatrician. Speech and hearing checks are routine, and you do not have to wait for a visit that is already booked."
             }
         }
-        
+
         let activities = [
-            "Narrate your day—'I'm washing the apple, now I'm drying it'",
-            "Read rhyming books to help them hear the sounds of language",
-            "Pause after asking a question to give them space to respond",
-            "Sing songs with hand motions like 'Itsy Bitsy Spider'"
+            "Say what you are doing as you do it: washing the apple, now drying the apple",
+            "Read books with rhyme and repetition so the same sounds come round again",
+            "Ask something, then wait longer than feels natural for an answer",
+            "Sing songs with hand actions, like Itsy Bitsy Spider"
         ]
-        
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
             pediatricNote: pediatric
         )
     }
-    
+
     private static func cognitiveResponse(age: Int, isConcern: Bool) -> AssistantResponse {
-        let reassurances = [
-            "Cognitive growth is often hidden. Curiosity, memory, and problem-solving are happening even during quiet play.",
-            "Children learn by testing. Dropping, banging, and hiding things are all scientific experiments to them.",
-            "Understanding how the world works is a huge job. Your child is building a map of their world every day."
+        let contexts = [
+            "Thinking is hard to see from the outside. Working out where a dropped toy went, or which lid fits which box, is the work happening.",
+            "Children learn by testing. Dropping, banging, and hiding things are how the rules of the world get checked.",
+            "Attention is short at this age by design. A few minutes of real focus is a lot."
         ]
-        
+
         let activities = [
-            "Play Peek-a-Boo to teach object permanence",
-            "Hide a toy under a blanket and let them find it",
-            "Sort toys by color or shape together",
-            "Read books with simple stories and ask 'what happens next?'"
+            "Play peek-a-boo, then hide a toy under a blanket for them to find",
+            "Sort things by color or shape while tidying up",
+            "Read a simple story and ask what happens next",
+            "Give them containers with lids and let them work out which fits"
         ]
-        
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
-            pediatricNote: isConcern ? "Your pediatrician can help assess cognitive development during well-child visits. It's always okay to ask. 💛" : nil
+            pediatricNote: isConcern
+                ? "If how your child is working things out is on your mind, bring it to your pediatrician. Well-child visits are a good place for it, and you can ask sooner."
+                : nil
         )
     }
-    
+
     private static func socialEmotionalResponse(age: Int, isConcern: Bool) -> AssistantResponse {
-        var reassurances: [String] = []
-        
+        var contexts: [String] = []
+
         if age < 24 {
-             reassurances = [
-                "Big feelings are normal for little people. Their emotional brain is growing faster than their logical brain.",
-                "Separation anxiety or stranger shyness are actually signs of strong, healthy attachment to you.",
-                "Tantrums are often communication when words aren't enough. They aren't 'bad behavior'—they are distress."
+            contexts = [
+                "Big feelings arrive before the words to explain them, which is why so much of it comes out as crying.",
+                "Wariness of strangers, and not wanting you to leave the room, are signs of attachment. They usually peak in the first two years.",
+                "Tantrums are usually communication rather than defiance. Something is wrong and there is no other way to say it yet."
             ]
         } else {
-             reassurances = [
-                "Learning to share and take turns is a long process. Parallel play (playing near others) is perfect for this age.",
-                "Empathy is a complex skill. Modeling kindness is the best way to teach it over time.",
-                "Testing boundaries is how children learn rules. It's exhausting but a normal sign of growing independence."
+            contexts = [
+                "Sharing and taking turns take years. Playing alongside another child rather than with them is normal well into the third year.",
+                "Empathy builds slowly and mostly by copying. What children see handled calmly, they start handling calmly.",
+                "Testing limits is how rules get learned. It is exhausting, and it is also a sign of growing independence."
             ]
         }
-        
+
         let activities = [
-            "Name feelings: 'You look sad that the blocks fell'",
-            "Practice taking turns rolling a ball",
-            "Cuddle and read books about feelings",
-            "Role-play with dolls or stuffed animals"
+            "Name the feeling out loud: you look upset that the blocks fell",
+            "Take turns rolling a ball back and forth",
+            "Read books about feelings and talk about the pictures",
+            "Play out an everyday scene with dolls or toy animals"
         ]
-        
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
-            pediatricNote: isConcern ? "If certain behaviors are worrying you or happening often, your pediatrician is a wonderful partner to discuss strategies. 💛" : nil
+            pediatricNote: isConcern
+                ? "If a behavior is worrying you or happening often, describe it to your pediatrician: what happens, how often, and what usually comes before it. That detail is what helps."
+                : nil
         )
     }
-    
+
     private static func generalResponse(age: Int) -> AssistantResponse {
-        let reassurances = [
-            "Every child grows at their own beautiful pace. You're doing a great job by simply paying attention.",
-            "Development isn't a race. It's a journey with many scenic stops along the way.",
-            "Trust your instincts. You know your child best, and your love is their most important fuel."
+        let contexts = [
+            "There is a wide range in when children do things, and most of that range is ordinary. What you notice day to day is the useful record.",
+            "Growth is uneven by nature. Children often work hard on one area while another sits still for a while.",
+            "You see your child more than anyone else does. Writing down what you notice gives you something specific to look back on."
         ]
-        
+
         let activities = [
-            "Spend 10 minutes of uninterrupted floor time together",
-            "Go for a walk and look for colors or sounds",
-            "Read a favorite book together for the 100th time!",
-            "Sing songs during transitions (like bath time or cleanup)"
+            "Ten minutes on the floor, following whatever they are already interested in",
+            "Go for a walk and name what you both see",
+            "Read a favorite book again, even for the hundredth time",
+            "Sing through the transitions, like bath time and cleaning up"
         ]
-            
+
         return AssistantResponse(
-            reassurance: reassurances.randomElement()!,
+            context: contexts.randomElement()!,
             activities: activities.shuffled().prefix(3).map { $0 },
-            pediatricNote: "Your pediatrician is always there for any questions, big or small. Well-child visits are perfect for these conversations. 💛"
+            pediatricNote: "If anything is on your mind, your pediatrician is the right person to ask. Well-child visits are a good time for it, and you do not have to wait for one."
         )
     }
 }

@@ -21,7 +21,7 @@ struct MilestoneShareCard: View {
     // context, the same way ReportBuilder is separate from ShareRenderer.
     static func caption(childName: String, dateCompleted: Date?) -> String {
         guard let dateCompleted else { return childName }
-        return "\(childName) · \(dateCompleted.formatted(date: .long, time: .omitted))"
+        return "\(childName), \(dateCompleted.formatted(date: .long, time: .omitted))"
     }
 
     private var captionText: String {

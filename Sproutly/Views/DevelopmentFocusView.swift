@@ -39,7 +39,7 @@ struct DomainConcern: Identifiable {
     let milestoneCount: Int
 
     var summary: String {
-        "\(milestoneCount) not saved yet"
+        "Not saved yet: \(milestoneCount)"
     }
 }
 
@@ -112,9 +112,12 @@ struct DevelopmentFocusView: View {
                     .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(Theme.textPrimary(for: nightMode))
 
-                Text("\(totalFlagged) milestone\(totalFlagged == 1 ? "" : "s") from earlier ages")
+                // Longer than the label it replaced, so it must be allowed to
+                // wrap rather than truncate beside the glyph.
+                Text("\(totalFlagged) thing\(totalFlagged == 1 ? "" : "s") from earlier ages you have not saved yet")
                     .font(Theme.sproutlyMeta)
                     .foregroundStyle(Theme.textSecondary(for: nightMode))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -131,13 +134,13 @@ struct DevelopmentFocusView: View {
     private var primaryCopy: String {
         switch concernLevel {
         case .reviewSuggested:
-            return "A few earlier milestones are still developing. This is very common \u{2014} every child grows at their own pace. Continue observing through everyday play and routines."
+            return "There are a few things from earlier ages you have not saved yet. That does not tell us whether your child can do them. Keep an eye out during everyday play and routines."
         case .needsAttention:
             // Deliberately observational. "Missing or delayed" plus "it's important to"
             // read as a finding about the child rather than as something noticed, which
             // is the one place the copy drifted from the tone rule the rest of the app
             // keeps. Says the same thing without handing the parent a verdict.
-            return "Several milestones for this age haven’t been logged yet. Your child’s doctor is a good person to talk this through with — and to suggest ways you can help."
+            return "There are a few things for this age that you have not saved yet. That does not tell us whether your child can do them. If you are wondering about any of them, bring your notes to your child's doctor. They can help you decide what to do next."
         }
     }
 
@@ -184,7 +187,7 @@ struct DevelopmentFocusView: View {
                 .foregroundStyle(accentColor)
                 .padding(.top, 2)
 
-            Text("Early support can make a meaningful difference. Pediatricians routinely screen for developmental milestones and welcome questions at any visit.")
+            Text("If you have questions, asking early helps you find the right support. Pediatricians check milestones as a matter of routine and welcome questions at any visit.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(Theme.textSecondary(for: nightMode))
                 .fixedSize(horizontal: false, vertical: true)
@@ -234,7 +237,7 @@ struct DevelopmentFocusView: View {
         VStack(alignment: .leading, spacing: 12) {
             interventionPoint(
                 icon: "checkmark.seal",
-                text: "You do not need a diagnosis to seek developmental support. Many programs accept referrals based on observation alone."
+                text: "You do not need a diagnosis to ask for support. Many programs accept referrals based on what a parent has noticed."
             )
             interventionPoint(
                 icon: "stethoscope",
@@ -242,11 +245,11 @@ struct DevelopmentFocusView: View {
             )
             interventionPoint(
                 icon: "figure.2.and.child.holdinghands",
-                text: "Early support programs work through everyday interactions \u{2014} play, feeding, bath time, and shared routines."
+                text: "Early support programs work through everyday interactions: play, feeding, bath time, and shared routines."
             )
             interventionPoint(
                 icon: "heart.fill",
-                text: "Seeking support is a sign of attentive parenting, not a cause for worry. The earliest years offer the greatest opportunity for growth."
+                text: "Asking for support is a normal thing to do, not a cause for worry. The earliest years are when it makes the most difference."
             )
         }
         .padding(.leading, 28)

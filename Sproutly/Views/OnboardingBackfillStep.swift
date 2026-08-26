@@ -137,7 +137,7 @@ private extension OnboardingBackfillStep {
                 .foregroundStyle(theme.text)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Tap anything you've already seen. You can change these any time.")
+            Text("Tap anything you have already seen. You can change these any time.")
                 .font(Theme.sproutlyBody)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(theme.textSecondary)

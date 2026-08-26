@@ -48,7 +48,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
         case .sprout:  return "Warm gold"
         case .twin:    return "For siblings and twins"
         case .night:   return "Deep navy"
-        case .blossom: return "In full bloom"
+        case .blossom: return "Pink blossom"
         }
     }
 

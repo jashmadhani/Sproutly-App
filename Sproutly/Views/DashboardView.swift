@@ -208,7 +208,7 @@ struct DashboardView: View {
         .buttonStyle(.plain)
         .warmCard(nightMode: theme.isNightMode)
         .accessibilityLabel("Report for your visit")
-        .accessibilityHint("Creates a PDF summary of \(child.displayName)'s milestones to share")
+        .accessibilityHint("Makes a PDF of what you have saved for \(child.displayName)")
     }
 
     // MARK: - Header Card
@@ -216,11 +216,11 @@ struct DashboardView: View {
     private var headerCard: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("\(child.displayName)’s growth")
+                Text("\(child.displayName)'s growth")
                     .font(.sproutlyDisplay(30))
                     .foregroundStyle(theme.text)
 
-                Text("You're \(child.humanReadableAge)!")
+                Text(child.humanReadableAge)
                     .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
             }
@@ -283,15 +283,17 @@ struct DashboardView: View {
                 ringCaption
             }
 
-            Text("\(viewModel.targetAgeMonth)-month milestones")
+            Text("Things to look for around \(viewModel.targetAgeMonth) months")
                 .font(Theme.sproutlyCardTitle)
                 .foregroundStyle(theme.text)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Milestone progress")
-        .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones completed for \(viewModel.targetAgeMonth) months")
+        .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones saved for \(viewModel.targetAgeMonth) months")
     }
 
     // MARK: - Photo Nudge
@@ -306,7 +308,7 @@ struct DashboardView: View {
                 .foregroundStyle(theme.blueText)
                 .frame(width: 24)
 
-            Text("Moments can hold a photo too. Worth doing for the ones you'll want to look back on.")
+            Text("A saved moment can hold a photo too. Worth it for the ones you will want to see again.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -341,12 +343,12 @@ struct DashboardView: View {
     // `NotificationManager.shouldOfferPermissionPrompt`.
     private var notificationPrompt: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Want a nudge now and then?")
+            Text("Want a reminder now and then?")
                 .font(Theme.sproutlyCardTitle)
                 .foregroundStyle(theme.text)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("One quiet note in the morning with something to look for, and a look back at the week on Sundays. Never more than one a day.")
+            Text("One note in the morning with something to look for, and a look back at the week on Sundays. Never more than one a day.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .lineSpacing(3)
@@ -413,7 +415,7 @@ struct DashboardView: View {
                     .foregroundStyle(theme.text)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("There's nothing here to save yet, and that's exactly right. Around \(viewModel.upcomingBandMonth) months you'll start noticing things like these.")
+                Text("There is nothing to save yet, and that is exactly right. Around \(viewModel.upcomingBandMonth) months you will start noticing things like these.")
                     .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
                     .lineSpacing(3)
@@ -455,7 +457,7 @@ struct DashboardView: View {
         .warmCard(nightMode: theme.isNightMode)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Sproutly starts at \(viewModel.upcomingBandMonth) months")
-        .accessibilityValue("A look at what you'll start noticing around \(viewModel.upcomingBandMonth) months")
+        .accessibilityValue("A look at what you will start noticing around \(viewModel.upcomingBandMonth) months")
     }
 
     // The ring's count and label. Declared once and placed either inside the
@@ -580,7 +582,7 @@ struct DashboardView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .foregroundStyle(theme.textSecondary)
-                    Text("What you save will show up here")
+                    Text("The things you save will show up here.")
                         .font(.subheadline)
                         .foregroundStyle(theme.textSecondary)
                 }
