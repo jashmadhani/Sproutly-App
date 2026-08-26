@@ -37,16 +37,29 @@ struct GrowthInsightsView: View {
                 id: "domains",
                 icon: "square.grid.3x3.fill",
                 title: "Five areas of growth",
+                // The parent-facing names, not the clinical ones. This list used
+                // the raw `MilestoneCategory` values ("Gross Motor", "Cognitive")
+                // while every other screen shows `gentleLabel`, so the one place
+                // that explains the five areas named them differently from the
+                // five tiles on the dashboard.
+                //
+                // The "Label — definition" dashes are gone too. Five of them
+                // stacked read as a generated glossary rather than something a
+                // person wrote.
                 body: """
-                    Child development is often observed across five areas:
+                    Children grow in five different ways, and Sproutly follows all of them.
 
-                    • Gross Motor — Large movements like walking, running, climbing
-                    • Fine Motor — Small movements like grasping, drawing, stacking
-                    • Language — Understanding and using words, gestures, and sounds
-                    • Cognitive — Thinking, problem-solving, learning, curiosity
-                    • Social-Emotional — Relationships, emotions, behavior, empathy
+                    Movement & Strength is the big stuff: rolling, walking, running, climbing.
 
-                    Every child develops across all five, but the pace differs from child to child.
+                    Hands & Coordination is the small stuff: grasping, drawing, stacking, feeding themselves.
+
+                    Communication covers understanding you and making themselves understood, in words, sounds and gestures.
+
+                    Curiosity & Thinking is how they work things out: solving problems, remembering, exploring.
+
+                    Connection & Emotion is how they relate to you and to other people, and how they handle feelings.
+
+                    Every child grows in all five. They just don't grow in all five at the same speed, and that's ordinary.
                     """
             )
 
@@ -55,7 +68,7 @@ struct GrowthInsightsView: View {
                 icon: "eye.fill",
                 title: "What you notice, and what a doctor checks",
                 body: """
-                    Watching how your child grows day to day — noticing what they can do at each age — is something you already do. That is what Sproutly helps you keep track of.
+                    Watching how your child grows, day to day, is something you already do. Sproutly is just somewhere to keep it.
 
                     Developmental screening uses brief, standardized tools at specific ages (9, 18, and 30 months) to check whether development is on track. Your pediatrician handles these.
 
@@ -68,11 +81,11 @@ struct GrowthInsightsView: View {
                 icon: "heart.fill",
                 title: "Why noticing early helps",
                 body: """
-                    Research consistently shows that early identification of developmental differences leads to better outcomes. The brain is most adaptable in the earliest years.
+                    Noticing something early tends to lead to better outcomes, because the brain is at its most adaptable in the first few years.
 
-                    If something comes up, early support programs can help — and a referral does not require a diagnosis first. They work through everyday interactions: play, meals, bath time.
+                    If something does come up, early support programs can help, and you don't need a diagnosis to be referred. They work through ordinary things: play, meals, bath time.
 
-                    Early support is not about labels. It's about giving every child the best possible start.
+                    It isn't about labels. It's about giving your child a good start.
                     """
             )
 
@@ -85,7 +98,7 @@ struct GrowthInsightsView: View {
 
                     • If speech development seems slower than expected, a hearing screening can rule out simple causes
                     • If you notice differences in social engagement, early evaluation can open doors to support
-                    • Any time you feel uncertain — pediatricians welcome these questions
+                    • Any time you're unsure. Pediatricians welcome these questions
 
                     Well-child visits are a good time to bring these up.
                     """

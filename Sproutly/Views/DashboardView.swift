@@ -101,9 +101,9 @@ struct DashboardView: View {
                         comingSoonCard
                     }
 
+                    growthInsightsSection
                     recentMomentsCard
                     screeningCards
-                    growthInsightsSection
                     reportCard
                 }
                 .padding(.horizontal, 20)
@@ -306,7 +306,7 @@ struct DashboardView: View {
                 .foregroundStyle(theme.blueText)
                 .frame(width: 24)
 
-            Text("Moments can hold a photo, too — worth doing for the ones you'll want to look back on.")
+            Text("Moments can hold a photo too. Worth doing for the ones you'll want to look back on.")
                 .font(Theme.sproutlyBody)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

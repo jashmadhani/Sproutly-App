@@ -314,12 +314,17 @@ enum NotificationPlanner {
               let fire = time(anniversaryHour, anniversaryMinute, on: day, calendar: calendar)
         else { return nil }
 
+        // A sentence, not "Name — Thing." Catalog titles start capitalised
+        // because they head a row; lowercased here they read as the rest of a
+        // sentence about the child rather than a label with a value attached.
+        let action = milestone.title.prefix(1).lowercased() + milestone.title.dropFirst()
+
         return PlannedNotification(
             kind: .anniversary,
             childID: childID,
             fireDate: fire,
             title: years == 1 ? "One year ago today" : "Two years ago today",
-            body: "\(childName) — \(milestone.title).",
+            body: "\(childName) \(action).",
             photoFilename: milestone.photoFilename
         )
     }

@@ -122,7 +122,7 @@ struct AddMilestoneSheet: View {
                                 // one step below the label above it. Three tiers
                                 // — 15 semibold label, 17 value, 13 footer — is
                                 // what gives the card a readable order.
-                                Text("This is just for grouping — your own moments never affect how Sproutly reads your child's development.")
+                                Text("This is just for grouping. Your own moments never affect how Sproutly reads your child's development.")
                                     .font(Theme.sproutlyMeta)
                                     .foregroundStyle(theme.textSecondary)
                                     .fixedSize(horizontal: false, vertical: true)

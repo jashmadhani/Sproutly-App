@@ -33,6 +33,7 @@ struct OnboardingView: View {
     @State private var backfillSelection: Set<String> = []
 
     @FocusState private var isNameFieldFocused: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private static let profileStepIndex = 4
 
@@ -311,22 +312,27 @@ private extension OnboardingView {
                 // (educational-only, not a substitute for professional care)
                 // survive, just tightened. Never drop either claim.
                 VStack(spacing: 16) {
-                    Text("Sproutly is an educational tool — not a substitute for professional medical advice, diagnosis, or treatment.")
+                    // Both required claims survive verbatim in substance — this
+                    // is educational only, and it is not a substitute for
+                    // professional care. What changed is the shape: the old
+                    // version leaned on an "X — not Y" apposition, which is the
+                    // construction that made the screen read as generated
+                    // rather than written. Short sentences instead.
+                    Text("Sproutly is here to help you notice and remember. It isn't a substitute for professional medical advice, diagnosis, or treatment.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.text)
                         .lineSpacing(4)
 
-                    Text("Always seek your pediatrician's advice for questions about your child's development.")
+                    Text("Anything you're wondering about is worth asking your pediatrician.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
                         .lineSpacing(4)
 
-                    // The real range, stated before the parent invests any time
-                    // — along with where to look instead if their baby is
-                    // younger than the app covers.
-                    Text("Sproutly covers 2 months to 5 years. For a younger baby, your pediatrician and the newborn well-visits are the right place to look.")
+                    // The real range, stated before the parent invests any time,
+                    // along with where to look instead for a younger baby.
+                    Text("Sproutly starts at 2 months and goes to 5 years. If your baby is younger than that, your pediatrician and the newborn visits are the place to look.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
@@ -481,10 +487,13 @@ private extension OnboardingView {
                     .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.text)
 
+                // No line limit. At two lines "See how much has changed since
+                // last month." truncated to "…since last mo…" on a real phone —
+                // the row has room to grow downward, so capping it only ever
+                // cost the end of a sentence.
                 Text(subtitle)
                     .font(Theme.sproutlyBody)
                     .foregroundStyle(theme.textSecondary)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -530,24 +539,54 @@ private extension OnboardingView {
     // Two exits, weighted the same. A parent who does not want to sit and tick
     // twelve boxes on their first minute in the app has not done anything wrong,
     // and the button that says so must not read as the lesser choice.
+    // Three capsules do not fit a phone.
+    //
+    // `SoftCapsuleStyle` pays 24pt of horizontal padding a side, so Back +
+    // "Skip for now" + "Done" came to roughly 413pt of content on a 393pt
+    // screen: on a real device the Back button was clipped off the leading
+    // edge and Done ran into the trailing one. Back is now a bare chevron with
+    // a 44pt target rather than a third capsule, and at accessibility text
+    // sizes the two exits stack full-width instead of competing for a line.
     var backfillButtons: some View {
-        HStack(spacing: 12) {
-            // Back belongs here like on every other step. Without it this screen
-            // was a one-way door — a parent who mistyped the birth date could
-            // only get out through Settings.
-            Button {
-#if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-#endif
-                goBack()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .foregroundStyle(theme.textSecondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 12) {
+                    doneButton.frame(maxWidth: .infinity)
+                    skipButton.frame(maxWidth: .infinity)
+                    backChevron
+                }
+            } else {
+                HStack(spacing: 12) {
+                    backChevron
+                    skipButton
+                    Spacer(minLength: 0)
+                    doneButton
+                }
             }
-            .buttonStyle(SoftCapsuleStyle(baseColor: theme.blue, nightMode: theme.isNightMode))
-            .disabled(isProcessing)
-            .accessibilityLabel("Back")
+        }
+    }
 
+    // Bare, not capsuled — the capsule is what overflowed the row.
+    var backChevron: some View {
+        Button {
+#if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+            goBack()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(theme.textSecondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isProcessing)
+        .accessibilityLabel("Back")
+    }
+
+    var skipButton: some View {
+        Group {
             Button {
                 guard !isProcessing else { return }
 #if os(iOS)
@@ -563,35 +602,35 @@ private extension OnboardingView {
             }
             .buttonStyle(SoftCapsuleStyle(baseColor: theme.green, nightMode: theme.isNightMode))
             .disabled(isProcessing)
-
-            Spacer(minLength: 0)
-
-            Button {
-                guard !isProcessing else { return }
-#if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-#endif
-                isProcessing = true
-                completeOnboarding(applying: backfillSelection)
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Done")
-                        .fontWeight(.semibold)
-                        .fixedSize()
-
-                    Image(systemName: "heart.fill")
-                }
-                .foregroundStyle(.white)
-            }
-            .buttonStyle(
-                SoftCapsuleStyle(
-                    baseColor: theme.blue,
-                    isAction: true,
-                    nightMode: theme.isNightMode
-                )
-            )
-            .disabled(isProcessing)
         }
+    }
+
+    var doneButton: some View {
+        Button {
+            guard !isProcessing else { return }
+#if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+            isProcessing = true
+            completeOnboarding(applying: backfillSelection)
+        } label: {
+            HStack(spacing: 8) {
+                Text("Done")
+                    .fontWeight(.semibold)
+                    .fixedSize()
+
+                Image(systemName: "heart.fill")
+            }
+            .foregroundStyle(.white)
+        }
+        .buttonStyle(
+            SoftCapsuleStyle(
+                baseColor: theme.blue,
+                isAction: true,
+                nightMode: theme.isNightMode
+            )
+        )
+        .disabled(isProcessing)
     }
 
     var standardButtons: some View {

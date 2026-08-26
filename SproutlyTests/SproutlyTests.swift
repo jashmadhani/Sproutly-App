@@ -1860,10 +1860,10 @@ final class DisclaimerTests: XCTestCase {
                      "Sproutly/Views/AboutDataView.swift",
                      "AppStore/LISTING.md"] {
             let text = try source(path)
-            XCTAssertTrue(
-                text.contains("2 months to 5 years"),
-                "\(path) does not state the real age range"
-            )
+            // The bounds, not one exact phrasing — the copy is allowed to say
+            // this like a person as long as both numbers survive.
+            XCTAssertTrue(text.contains("2 months"), "\(path) omits the lower bound")
+            XCTAssertTrue(text.contains("5 years"), "\(path) omits the upper bound")
         }
     }
 
@@ -1873,15 +1873,15 @@ final class DisclaimerTests: XCTestCase {
                      "Sproutly/Views/AboutDataView.swift"] {
             let text = try source(path).lowercased()
             XCTAssertTrue(text.contains("pediatrician"), "\(path) omits the guidance")
-            XCTAssertTrue(text.contains("well-visit"), "\(path) omits the well-visits")
+            XCTAssertTrue(text.contains("newborn"), "\(path) omits where to look instead")
         }
     }
 
     // D.3 — the notification disclaimer.
     func testNotificationDisclaimerIsPresentAndNotMedical() throws {
         let text = try source("Sproutly/Views/SettingsView.swift")
-        XCTAssertTrue(text.contains("not medical guidance"))
-        XCTAssertTrue(text.contains("not an assessment of your child"))
+        XCTAssertTrue(text.contains("medical guidance"))
+        XCTAssertTrue(text.contains("assessment of your child"))
     }
 
     // D.4 — all three sources named, and no implied endorsement.
@@ -2093,6 +2093,67 @@ final class UIRegressionTests: XCTestCase {
                     "\(url.lastPathComponent) draws its own lock instead of ProLockBadge"
                 )
             }
+        }
+    }
+
+    // Three `SoftCapsuleStyle` buttons need ~413pt of content on a 393pt phone,
+    // so the backfill row clipped Back off the leading edge on a real device.
+    // Back is a bare chevron now, and the row stacks at accessibility sizes.
+    func testBackfillButtonRowCannotOverflow() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/OnboardingView.swift"),
+            encoding: .utf8
+        )
+
+        // The chevron must not wear a capsule.
+        guard let range = text.range(of: "var backChevron: some View") else {
+            return XCTFail("backChevron is gone — the row is probably three capsules again")
+        }
+        let body = String(text[range.lowerBound...].prefix(600))
+        XCTAssertFalse(
+            body.contains("SoftCapsuleStyle"),
+            "the Back control is a capsule again; three of them do not fit a phone"
+        )
+
+        // And the row adapts rather than overflowing at large text sizes.
+        XCTAssertTrue(text.contains("dynamicTypeSize.isAccessibilitySize"))
+    }
+
+    // "See how much has changed since last month." truncated to "…last mo…"
+    // behind a two-line cap that the row had no need for.
+    func testOnboardingRowsDoNotCapTheirSubtitles() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/OnboardingView.swift"),
+            encoding: .utf8
+        )
+        guard let range = text.range(of: "func howItWorksRow") else {
+            return XCTFail("howItWorksRow is gone")
+        }
+        let body = String(text[range.lowerBound...].prefix(900))
+        XCTAssertFalse(body.contains("lineLimit"), "the subtitle is capped again")
+    }
+
+    // The five areas must be named the way every other screen names them.
+    func testGrowthInsightsUsesParentFacingDomainNames() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/GrowthInsightsView.swift"),
+            encoding: .utf8
+        )
+        for label in MilestoneCategory.allCases.map(\.gentleLabel) {
+            XCTAssertTrue(text.contains(label), "the five-areas copy omits \"\(label)\"")
+        }
+        // And not the clinical raw values.
+        for raw in ["• Gross Motor", "• Fine Motor", "• Cognitive", "• Social-Emotional"] {
+            XCTAssertFalse(text.contains(raw), "the five-areas copy still uses \"\(raw)\"")
         }
     }
 

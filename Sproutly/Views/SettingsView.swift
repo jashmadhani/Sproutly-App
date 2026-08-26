@@ -323,7 +323,7 @@ struct SettingsView: View {
             Theme.divider(nightMode: theme.isNightMode)
 
             // D.3, once, at the same weight as every other footnote.
-            Text("These are reminders to look and remember — not medical guidance, and not an assessment of your child.")
+            Text("These are reminders to look and remember. They aren't medical guidance, and they aren't an assessment of your child.")
                 .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

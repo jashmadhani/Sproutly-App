@@ -42,7 +42,7 @@ struct AboutDataView: View {
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.text)
 
-                        Text("For a baby under two months, your pediatrician and the newborn well-visits are the right place to look — not this app.")
+                        Text("If your baby is younger than two months, your pediatrician and the newborn visits are the place to look.")
                             .font(.body)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.textSecondary)

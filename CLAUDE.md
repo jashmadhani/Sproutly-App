@@ -174,6 +174,14 @@ BETTER:
 
 These are examples of the writing direction, not mandatory replacements.
 
+### The em-dash apposition
+
+`Label — definition` is the single most reliable tell that copy was generated rather than written, and it was all over the app: five stacked in the "Five areas of growth" list, one in the onboarding disclaimer, one in every notification body. Read aloud, none of them sound like a person.
+
+Write two short sentences instead, or use a colon when you genuinely mean "here are the examples". A dash used conversationally mid-sentence is fine — the milestone tips do it and they read naturally. What is not fine is a dash standing in for "is defined as".
+
+Related: **user-facing copy names the five areas with `gentleLabel`**, never the raw `MilestoneCategory` values. The insights card explained them as "Gross Motor", "Cognitive" while the five tiles beside it said "Movement & Strength", "Curiosity & Thinking".
+
 ### Avoid AI-sounding language
 
 Do not repeatedly use words or phrases such as:
