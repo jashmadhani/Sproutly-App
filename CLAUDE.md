@@ -512,6 +512,19 @@ Gated features are **visible with a lock**, never hidden — a feature a free pa
 
 **No price or currency symbol may appear anywhere in the target**, including comments and fallbacks. Every figure comes from `product.displayPrice`; before the product resolves the paywall shows a spinner, never a stand-in number. `ProDiscoverabilityTests.testNoHardcodedCurrencyAnywhereInTheTarget` enforces this over string literals and comments.
 
+## What has been verified on a render
+
+Reaching every screen without tap automation is slow if each one needs a rebuild. The technique that works: patch temporary `dbg_*` hooks that read `UserDefaults` (tab, sheet, onboarding step, night mode), build **once**, then drive the app with `simctl spawn <dev> defaults write <bundle> dbg_tab settings` + relaunch + screenshot. Two gotchas, both learned the hard way:
+
+- **`simctl spawn defaults` writes outside the app container**, so those keys survive an uninstall. Clear them explicitly between runs or a stale key silently steers the next screenshot.
+- The same store sharing means a `defaults write` done while debugging **leaks into the test bundle**, which is hosted by the app. It silently broke the notification-prompt test once. Tests that read app defaults must clear them in `setUp`.
+
+Covered as of Phase 1.5: Dashboard, Milestones, Assistant, Settings; onboarding steps 1–6 including the backfill step and the 5-step path for a young baby; the completion-note, Add-a-Child, About-the-Data, App-Icon, Pro-Features and paywall sheets; Growth Insights and Development Focus expanded; the coming-soon card for a three-week-old. At default text size, the largest accessibility size, Increase Contrast, and night mode.
+
+Contrast measured from renders rather than eyeballed — all pairs clear AA. Day: primary text 13.2:1, secondary 7.6:1, the Pro gold mark 5.83:1 on card (2.76:1 before `proGoldText`). Night: primary 9.5:1, secondary 5.7:1, gold 5.80:1.
+
+**Not covered, and needing a real device or Xcode:** VoiceOver order and Voice Control (no UI test target exists, so `performAccessibilityAudit` can't run), and the paywall's *priced* state — `Sproutly.storekit` is a scheme setting, so a `simctl launch` always shows the product-load-failure state. That failure state was verified and is correct: no price, no fabricated number, a retry.
+
 ## Open decisions
 
 - **The Development Focus card now counts much higher.** Seen on a real render: a 20-month-old with 22 milestones saved shows *"47 milestones from earlier ages"*. That is arithmetically correct — bands ≤20 now hold 70 milestones instead of the pre-Phase-1.5 40 — but growing the catalog roughly doubled the number a parent is shown above an Early Intervention panel, and 47 reads as an indictment rather than an observation. The card cannot tell "hasn't opened the app much" from "child isn't doing these". Options: drop the raw total and keep only the per-domain breakdown; require a minimum *proportion* rather than a count; or cap what is displayed. A product decision about what the app asserts, so deliberately not changed. `DashboardViewModel.concernFloorMonths` already stops it appearing below nine months.
