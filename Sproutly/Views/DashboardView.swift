@@ -36,9 +36,24 @@ struct DashboardView: View {
 
     @State private var viewModel = DashboardViewModel()
     @State private var scrollOffset: CGFloat = 0
-    @State private var shareItem: ShareItem? = nil
     @State private var isBuildingReport = false
-    @State private var paywallReason: PaywallReason? = nil
+
+    // One binding for both modals this screen owns — stacking `.sheet`
+    // modifiers is the pattern SettingsView documents as unreliable, and the
+    // report flow can hand off straight from the paywall to the share sheet.
+    private enum DashboardSheet: Identifiable {
+        case share(ShareItem)
+        case paywall(PaywallReason)
+
+        var id: String {
+            switch self {
+            case .share(let item):     return "share-\(item.id)"
+            case .paywall(let reason): return "paywall-\(reason.id)"
+            }
+        }
+    }
+
+    @State private var activeSheet: DashboardSheet? = nil
     // Read once into state so dismissing it takes effect immediately rather
     // than waiting for the next body pass to re-read UserDefaults.
     @State private var showPhotoNudge = MilestoneLogCounter.shouldShowPhotoNudge
@@ -116,11 +131,11 @@ struct DashboardView: View {
         .onAppear {
             viewModel.update(milestones: milestones, child: child)
         }
-        .sheet(item: $shareItem) { item in
-            ShareSheet(url: item.url)
-        }
-        .sheet(item: $paywallReason) { reason in
-            PaywallView(reason: reason)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .share(let item):     ShareSheet(url: item.url)
+            case .paywall(let reason): PaywallView(reason: reason)
+            }
         }
     }
 
@@ -133,7 +148,7 @@ struct DashboardView: View {
             guard let active = childStore.activeChild, !isBuildingReport else { return }
             Task { @MainActor in
                 guard await purchases.isUnlocked() else {
-                    paywallReason = .report
+                    activeSheet = .paywall(.report)
                     return
                 }
                 isBuildingReport = true
@@ -144,7 +159,7 @@ struct DashboardView: View {
                 await Task.yield()
                 let report = ReportBuilder.build(for: active)
                 if let url = ShareRenderer.pdf(for: report) {
-                    shareItem = ShareItem(url: url)
+                    activeSheet = .share(ShareItem(url: url))
                 }
                 isBuildingReport = false
             }

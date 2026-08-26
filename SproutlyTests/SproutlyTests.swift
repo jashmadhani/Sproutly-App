@@ -2096,6 +2096,49 @@ final class UIRegressionTests: XCTestCase {
         }
     }
 
+    // Stacking `.sheet` modifiers on one view makes SwiftUI's presentations
+    // compete, and some silently never appear. MilestonesView had four and
+    // DashboardView two; the former even carried a hand-timed `Task.sleep` to
+    // work around two animations chaining. One enum-driven binding per screen.
+    func testNoViewStacksSheetModifiers() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            let lines = try String(contentsOf: url, encoding: .utf8)
+                .components(separatedBy: .newlines)
+
+            let sheets = lines.filter { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return trimmed.hasPrefix(".sheet(") && !trimmed.hasPrefix("//")
+            }
+
+            XCTAssertLessThanOrEqual(
+                sheets.count, 1,
+                "\(url.lastPathComponent) stacks \(sheets.count) sheet modifiers — use one enum-driven binding"
+            )
+        }
+    }
+
+    // The workaround the stacking forced. With one binding the presentation
+    // simply changes, so nothing has to be hand-timed.
+    func testPhotoPaywallHandoffIsNotHandTimed() throws {
+        let text = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/MilestonesView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(
+            text.contains("Task.sleep"),
+            "a sheet handoff is being timed by hand again"
+        )
+    }
+
     // Eight places drew a glyph on a disc; four pinned the disc with a fixed
     // `.frame(width:)` while the glyph used `sproutlyScaledFont`, so at
     // accessibility sizes the icon grew out of its own ornament. `ScaledIconDisc`

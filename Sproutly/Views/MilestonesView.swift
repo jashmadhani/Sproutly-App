@@ -35,17 +35,45 @@ struct MilestonesView: View {
 
     @State private var selectedFilter: MilestoneFilter = .thisStage
     @State private var expandedDomains: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
-    @State private var milestoneForNote: Milestone? = nil
+    // One sheet binding rather than four.
+    //
+    // Four stacked `.sheet` modifiers on one view is the pattern SettingsView
+    // already documents as unreliable: SwiftUI's presentations compete and some
+    // silently never appear. It was not theoretical here — the photo button
+    // still carries a hand-written dismiss-then-sleep to get around two sheet
+    // animations chaining. Every modal this screen owns now goes through
+    // `activeSheet`, the same shape Settings uses.
+    private enum MilestoneSheet: Identifiable {
+        case note(Milestone)
+        case share(ShareItem)
+        case paywall(PaywallReason)
+        case addMoment
+
+        var id: String {
+            switch self {
+            case .note(let milestone): return "note-\(milestone.id)"
+            case .share(let item):     return "share-\(item.id)"
+            case .paywall(let reason): return "paywall-\(reason.id)"
+            case .addMoment:           return "addMoment"
+            }
+        }
+    }
+
+    @State private var activeSheet: MilestoneSheet? = nil
+
+    /// The milestone whose note sheet is open, when one is.
+    private var milestoneForNote: Milestone? {
+        if case .note(let milestone) = activeSheet { return milestone }
+        return nil
+    }
+
     @State private var noteText: String = ""
     @FocusState private var isNoteFocused: Bool
     @State private var milestoneToUncheck: Milestone? = nil
     @State private var showRemoveAlert: Bool = false
-    @State private var showAddMilestone: Bool = false
     @State private var pendingPhotoData: Data? = nil
     @State private var milestoneToDelete: Milestone? = nil
     @State private var showDeleteMilestoneAlert: Bool = false
-    @State private var shareItem: ShareItem? = nil
-    @State private var paywallReason: PaywallReason? = nil
     @Namespace private var photoZoomNamespace
     @State private var expandedPhotoMilestone: Milestone? = nil
     @State private var expandedPhotoImage: UIImage? = nil
@@ -137,11 +165,25 @@ struct MilestonesView: View {
                 PhotoStore.image(named: filename)
             }.value
         }
-        .sheet(item: $milestoneForNote) { milestone in
-            completionNoteSheet(for: milestone)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(theme.card)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .note(let milestone):
+                completionNoteSheet(for: milestone)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(theme.card)
+
+            case .share(let item):
+                ShareSheet(url: item.url)
+
+            case .paywall(let reason):
+                PaywallView(reason: reason)
+
+            case .addMoment:
+                if let active = childStore.activeChild {
+                    AddMilestoneSheet(child: active)
+                }
+            }
         }
         .alert("Remove Milestone?", isPresented: $showRemoveAlert, presenting: milestoneToUncheck) { milestone in
             Button("Cancel", role: .cancel) { milestoneToUncheck = nil }
@@ -168,17 +210,6 @@ struct MilestonesView: View {
         } message: { milestone in
             Text("\"\(milestone.title)\" will be removed permanently.")
         }
-        .sheet(item: $shareItem) { item in
-            ShareSheet(url: item.url)
-        }
-        .sheet(item: $paywallReason) { reason in
-            PaywallView(reason: reason)
-        }
-        .sheet(isPresented: $showAddMilestone) {
-            if let active = childStore.activeChild {
-                AddMilestoneSheet(child: active)
-            }
-        }
     }
 
     // MARK: - Header
@@ -202,9 +233,9 @@ struct MilestonesView: View {
             Button {
                 Task { @MainActor in
                     if await purchases.isUnlocked() {
-                        showAddMilestone = true
+                        activeSheet = .addMoment
                     } else {
-                        paywallReason = .customMilestone
+                        activeSheet = .paywall(.customMilestone)
                     }
                 }
             } label: {
@@ -502,7 +533,7 @@ struct MilestonesView: View {
                 Button {
                     Task { @MainActor in
                         guard await purchases.isUnlocked() else {
-                            paywallReason = .shareCard
+                            activeSheet = .paywall(.shareCard)
                             return
                         }
                         if let url = ShareRenderer.card(
@@ -510,7 +541,7 @@ struct MilestonesView: View {
                             childName: child.displayName,
                             nightMode: theme.isNightMode
                         ) {
-                            shareItem = ShareItem(url: url)
+                            activeSheet = .share(ShareItem(url: url))
                         }
                     }
                 } label: {
@@ -604,18 +635,16 @@ struct MilestonesView: View {
                 )
             } else {
                 Button {
-                    // Presenting a second .sheet while this completion sheet
-                    // is still on screen forces SwiftUI to dismiss-then-
-                    // present sequentially — two full sheet animations
-                    // chained is exactly what read as "takes a long time to
-                    // appear." Dismissing first and presenting the paywall
-                    // once that animation finishes is one clean transition
-                    // instead of two stacked ones.
-                    resetSheetState()
-                    Task {
-                        try? await Task.sleep(for: .seconds(0.35))
-                        paywallReason = .photo
-                    }
+                    // One binding, one swap. This used to dismiss the note
+                    // sheet, sleep 0.35s, and only then present the paywall —
+                    // a hand-timed workaround for two *separate* `.sheet`
+                    // modifiers fighting over the same screen, which chained
+                    // two full animations and read as "it takes ages to
+                    // appear". With a single `activeSheet` the presentation
+                    // simply changes, so the wait can go.
+                    noteText = ""
+                    pendingPhotoData = nil
+                    activeSheet = .paywall(.photo)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "photo.badge.plus")
@@ -696,7 +725,7 @@ struct MilestonesView: View {
 
     // marking → show note sheet, unmarking → toggle immediately
     private func resetSheetState() {
-        milestoneForNote = nil
+        activeSheet = nil
         noteText = ""
         pendingPhotoData = nil
     }
@@ -715,7 +744,7 @@ struct MilestonesView: View {
                 saveContext()
             }
         } else {
-            milestoneForNote = milestone
+            activeSheet = .note(milestone)
         }
     }
 
