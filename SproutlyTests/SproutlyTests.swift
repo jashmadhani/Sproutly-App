@@ -1587,6 +1587,203 @@ final class MilestoneLogCounterTests: XCTestCase {
     }
 }
 
+// MARK: - Pro Discoverability and Currency
+
+@MainActor
+final class ProDiscoverabilityTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        MilestoneLogCounter.reset()
+    }
+
+    override func tearDown() {
+        MilestoneLogCounter.reset()
+        super.tearDown()
+    }
+
+    // Nothing may hardcode a price or a currency. Every figure a parent sees
+    // comes from StoreKit's `displayPrice`, already formatted for their store.
+    func testNoHardcodedCurrencyAnywhereInTheTarget() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // SproutlyTests
+            .deletingLastPathComponent()   // repo root
+
+        let scanned = ["Sproutly", "SproutlyTests"].map {
+            sourceRoot.appendingPathComponent($0)
+        }
+
+        // Scoped to string literals — the only text that can reach a parent.
+        // Scanning raw source instead would flag Swift's `$0` closure shorthand
+        // and every `0.75` threshold in the scoring code, none of which is a
+        // price. Comments are checked separately below.
+        let literal = try NSRegularExpression(pattern: #""([^"\\]|\\.)*""#)
+        let currencySymbol = try NSRegularExpression(pattern: #"[$€£¥₹]\s?\d"#)
+        let interpolation = try NSRegularExpression(pattern: #"\\\([^)]*\)"#)
+        let priceShaped = try NSRegularExpression(
+            pattern: #"[$€£¥₹]\s?\d|\b\d+[.,]\d{2}\b"#
+        )
+
+        var offenders: [String] = []
+
+        for root in scanned {
+            guard let files = FileManager.default.enumerator(
+                at: root, includingPropertiesForKeys: nil
+            ) else { continue }
+
+            for case let url as URL in files where url.pathExtension == "swift" {
+                // This test's own patterns would match themselves.
+                if url.lastPathComponent == "SproutlyTests.swift" { continue }
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+
+                for (index, line) in text.components(separatedBy: .newlines).enumerated() {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    let range = NSRange(line.startIndex..., in: line)
+
+                    // A price written into a comment is a fact that will drift
+                    // the moment per-territory pricing is set, so it counts too
+                    // — but only an actual currency amount. Comments are full of
+                    // legitimate decimals: contrast ratios, scoring thresholds,
+                    // the 4.33 weeks-per-month constant.
+                    if trimmed.hasPrefix("//") {
+                        let commentRange = NSRange(trimmed.startIndex..., in: trimmed)
+                        if currencySymbol.firstMatch(in: trimmed, range: commentRange) != nil {
+                            offenders.append("\(url.lastPathComponent):\(index + 1) (comment) — \(trimmed)")
+                        }
+                        continue
+                    }
+
+                    for match in literal.matches(in: line, range: range) {
+                        guard let matchRange = Range(match.range, in: line) else { continue }
+                        // Interpolations are code, not displayed text, and
+                        // `"\($0)"` would otherwise read as a dollar amount.
+                        let content = interpolation.stringByReplacingMatches(
+                            in: String(line[matchRange]),
+                            range: NSRange(
+                                String(line[matchRange]).startIndex...,
+                                in: String(line[matchRange])
+                            ),
+                            withTemplate: ""
+                        )
+                        let contentRange = NSRange(content.startIndex..., in: content)
+                        if priceShaped.firstMatch(in: content, range: contentRange) != nil {
+                            offenders.append("\(url.lastPathComponent):\(index + 1) — \(content)")
+                        }
+                    }
+                }
+            }
+        }
+
+        XCTAssertTrue(
+            offenders.isEmpty,
+            "hardcoded price or currency found:\n" + offenders.joined(separator: "\n")
+        )
+    }
+
+    // Before the product resolves there must be a neutral placeholder and never
+    // a stand-in number, which would be wrong in most of the world.
+    func testPaywallShowsNoPriceUntilTheProductResolves() {
+        let manager = PurchaseManager()
+
+        XCTAssertNil(manager.product, "no product before StoreKit answers")
+        XCTAssertFalse(manager.hasCheckedEntitlements)
+
+        // Every price shown is derived from the product; with none there is
+        // nothing to render and the view falls to its spinner branch.
+        XCTAssertNil(manager.product?.displayPrice)
+    }
+
+    // MARK: The post-value nudge
+
+    func testPhotoNudgeFiresOnceAndNeverAgainAfterDismissal() {
+        XCTAssertFalse(MilestoneLogCounter.shouldShowPhotoNudge)
+
+        for index in 0..<MilestoneLogCounter.photoNudgeAfterLogs {
+            MilestoneLogCounter.record(
+                Milestone(
+                    title: "Logged \(index)", category: "Language", ageMonth: 12,
+                    isCompleted: true, dateCompleted: Date()
+                )
+            )
+        }
+
+        XCTAssertTrue(MilestoneLogCounter.shouldShowPhotoNudge)
+
+        MilestoneLogCounter.dismissPhotoNudge()
+        XCTAssertFalse(MilestoneLogCounter.shouldShowPhotoNudge)
+
+        // Logging more must not bring it back.
+        for index in 0..<5 {
+            MilestoneLogCounter.record(
+                Milestone(
+                    title: "More \(index)", category: "Cognitive", ageMonth: 12,
+                    isCompleted: true, dateCompleted: Date()
+                )
+            )
+        }
+        XCTAssertFalse(MilestoneLogCounter.shouldShowPhotoNudge)
+    }
+
+    func testBackfilledMilestonesDoNotAdvanceTheNudgeCounter() {
+        for index in 0..<20 {
+            MilestoneLogCounter.record(
+                Milestone(
+                    title: "Backfilled \(index)", category: "Fine Motor", ageMonth: 6,
+                    isCompleted: true, dateCompleted: nil
+                )
+            )
+        }
+        XCTAssertEqual(MilestoneLogCounter.count, 0)
+        XCTAssertFalse(MilestoneLogCounter.shouldShowPhotoNudge)
+    }
+
+    // MARK: Reach-triggering
+
+    // The paywall is reached by tapping a locked feature. Nothing may present
+    // it from onboarding, from launch, or from a notification.
+    func testNoPaywallIsPresentedFromOnboardingLaunchOrNotifications() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let mustNotPresent = [
+            "Views/OnboardingView.swift",
+            "Views/OnboardingBackfillStep.swift",
+            "Managers/NotificationManager.swift",
+            "Managers/NotificationPlanner.swift",
+            "Components/DailyNoticeCard.swift",
+            "MyApp.swift"
+        ]
+
+        for path in mustNotPresent {
+            let url = sourceRoot.appendingPathComponent(path)
+            let text = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertFalse(text.contains("PaywallView("), "\(path) presents the paywall")
+            XCTAssertFalse(text.contains("paywallReason ="), "\(path) triggers the paywall")
+        }
+    }
+
+    // Every gated entry point must be visible with a lock rather than hidden —
+    // a feature a free parent never sees converts at zero.
+    func testEveryGatedEntryPointShowsALockAffordance() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly/Views")
+
+        for file in ["DashboardView.swift", "MilestonesView.swift", "SettingsView.swift"] {
+            let text = try String(
+                contentsOf: sourceRoot.appendingPathComponent(file), encoding: .utf8
+            )
+            XCTAssertTrue(
+                text.contains("lock.fill"),
+                "\(file) gates a feature without showing a lock"
+            )
+        }
+    }
+}
+
 // MARK: - Purchases
 
 @MainActor

@@ -66,6 +66,9 @@ struct SettingsView: View {
                     profileSection
                     prematuritySection
                     notificationsSection
+                    if !purchases.isPro {
+                        proSection
+                    }
                     moreSection
                     dataSection
                 }
@@ -209,6 +212,48 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
     }
     
+    // MARK: - Pro
+
+    // One quiet door, for the parent who never happens to tap a locked feature
+    // and so would otherwise never learn Pro exists. Deliberately a Settings
+    // row and nothing else: no badge, no banner, no tab-bar dot, nothing on the
+    // dashboard.
+    //
+    // The feature list sits open underneath rather than behind the row, so the
+    // offer can be read and judged without being sold to first. The price is
+    // not repeated here — it lives on the paywall, where it comes from
+    // StoreKit's own localised `displayPrice`.
+    private var proSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                activeSheet = .paywall(.secondChild)
+            } label: {
+                settingsRow(
+                    icon: "star.fill",
+                    iconColor: theme.proGold,
+                    title: "Sproutly Pro",
+                    titleColor: theme.text
+                ) { chevron }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Sproutly Pro")
+            .accessibilityHint("One payment, yours forever")
+
+            Theme.divider(nightMode: theme.isNightMode)
+                .padding(.leading, Theme.cardPadding)
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text("One payment, yours forever.")
+                    .font(Theme.sproutlyBody)
+                    .foregroundStyle(theme.textSecondary)
+
+                ProFeatureListView()
+            }
+            .padding(Theme.cardPadding)
+        }
+        .groupedCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - Notifications
 
     // Default off, and the master switch is the only thing that can ask for
@@ -436,6 +481,13 @@ struct SettingsView: View {
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
                     Spacer()
+                    // Only from the second child on — the first is free, so a
+                    // lock there would claim something untrue.
+                    if !purchases.isPro && !childStore.children.isEmpty {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(theme.proGold)
+                    }
                 }
             }
             .buttonStyle(.plain)

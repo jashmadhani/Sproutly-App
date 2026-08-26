@@ -7,8 +7,13 @@ import Foundation
 import StoreKit
 import Observation
 
-// Single non-consumable unlock. No tiers, no subscription, no trial — for a $9.99
-// one-time purchase the paywall itself is the trial.
+// Single non-consumable unlock. No tiers, no subscription, no trial — for a
+// modest one-time purchase the paywall itself is the trial.
+//
+// The amount is deliberately not written down anywhere in the app, comments
+// included. Pricing is per-territory and set in App Store Connect, and every
+// figure a parent sees comes from `product.displayPrice`, which StoreKit has
+// already formatted for their store and currency.
 @MainActor
 @Observable
 final class PurchaseManager {

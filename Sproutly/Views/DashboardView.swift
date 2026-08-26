@@ -39,6 +39,9 @@ struct DashboardView: View {
     @State private var shareItem: ShareItem? = nil
     @State private var isBuildingReport = false
     @State private var paywallReason: PaywallReason? = nil
+    // Read once into state so dismissing it takes effect immediately rather
+    // than waiting for the next body pass to re-read UserDefaults.
+    @State private var showPhotoNudge = MilestoneLogCounter.shouldShowPhotoNudge
 
     // MARK: - Body
 
@@ -63,6 +66,10 @@ struct DashboardView: View {
 
                     if notifications.shouldOfferPermissionPrompt {
                         notificationPrompt
+                    }
+
+                    if showPhotoNudge {
+                        photoNudge
                     }
 
                     // A baby younger than the first band Sproutly covers has
@@ -165,9 +172,13 @@ struct DashboardView: View {
                 if isBuildingReport {
                     ProgressView()
                 } else {
-                    Image(systemName: "square.and.arrow.up")
+                    // The lock is shown rather than the row being hidden: a
+                    // feature a free parent never sees converts at zero, and
+                    // a tap that unexpectedly lands on a paywall is worse than
+                    // one that said so first.
+                    Image(systemName: purchases.isPro ? "square.and.arrow.up" : "lock.fill")
                         .sproutlyRowIcon()
-                        .foregroundStyle(theme.blueText)
+                        .foregroundStyle(purchases.isPro ? theme.blueText : theme.proGold)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -260,6 +271,45 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Milestone progress")
         .accessibilityValue("\(viewModel.currentStageCompleted) of \(viewModel.currentStageTotal) milestones completed for \(viewModel.targetAgeMonth) months")
+    }
+
+    // MARK: - Photo Nudge
+
+    // One line, once, after the fifth genuinely logged milestone. Not a modal,
+    // not a sheet, and never shown again once dismissed. Backfilled milestones
+    // do not count toward the five — see MilestoneLogCounter.
+    private var photoNudge: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "photo.badge.plus")
+                .sproutlyScaledFont(16, relativeTo: .subheadline)
+                .foregroundStyle(theme.blueText)
+                .frame(width: 24)
+
+            Text("Moments can hold a photo, too — worth doing for the ones you'll want to look back on.")
+                .font(Theme.sproutlyBody)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    MilestoneLogCounter.dismissPhotoNudge()
+                    showPhotoNudge = false
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(theme.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .warmCard(nightMode: theme.isNightMode)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Notification Prompt

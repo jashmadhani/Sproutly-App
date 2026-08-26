@@ -138,8 +138,11 @@ struct PaywallView: View {
                         ProgressView().tint(.white)
                     } else {
                         // The price carries the weight rather than sitting inside a
-                        // sentence — at $9.99 the number is the reassurance, not the
-                        // obstacle, so it should be the thing the eye lands on.
+                        // sentence — for a one-time purchase this size the number is
+                        // the reassurance, not the obstacle, so it should be the
+                        // thing the eye lands on. Always `displayPrice`: never a
+                        // literal, and never a fallback figure when the product
+                        // hasn't resolved — the branch above shows a spinner instead.
                         HStack(spacing: 10) {
                             Text("Unlock everything")
                                 .font(.headline)

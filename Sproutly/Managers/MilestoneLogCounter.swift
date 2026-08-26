@@ -35,5 +35,27 @@ enum MilestoneLogCounter {
 
     static func reset() {
         UserDefaults.standard.removeObject(forKey: countKey)
+        UserDefaults.standard.removeObject(forKey: photoNudgeDismissedKey)
+    }
+
+    // MARK: - Photo Nudge
+
+    private static let photoNudgeDismissedKey = "sproutly_photo_nudge_dismissed"
+
+    /// Shown after the fifth genuinely logged milestone, once.
+    ///
+    /// Deliberately after the value rather than before it: a parent who has
+    /// saved five moments knows what the app is for, and pointing out that a
+    /// moment can carry a photo is then useful rather than a pitch. Dismissing
+    /// it settles the matter permanently.
+    static let photoNudgeAfterLogs = 5
+
+    static var shouldShowPhotoNudge: Bool {
+        guard !UserDefaults.standard.bool(forKey: photoNudgeDismissedKey) else { return false }
+        return count >= photoNudgeAfterLogs
+    }
+
+    static func dismissPhotoNudge() {
+        UserDefaults.standard.set(true, forKey: photoNudgeDismissedKey)
     }
 }

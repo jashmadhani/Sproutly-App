@@ -516,7 +516,10 @@ struct MilestonesView: View {
                         }
                     }
                 } label: {
-                    Label("Share this moment", systemImage: "square.and.arrow.up")
+                    Label(
+                        "Share this moment",
+                        systemImage: purchases.isPro ? "square.and.arrow.up" : "lock.fill"
+                    )
                 }
             }
 
