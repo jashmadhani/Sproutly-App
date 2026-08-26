@@ -99,15 +99,13 @@ struct DevelopmentFocusView: View {
 
     private var headerSection: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(accentColor.opacity(0.12))
-                    .frame(width: 36, height: 36)
-
-                Image(systemName: concernLevel.icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(accentColor)
-            }
+            ScaledIconDisc(
+                systemImage: concernLevel.icon,
+                fill: accentColor.opacity(0.12),
+                tint: accentColor,
+                diameter: 36,
+                glyphSize: 15
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(concernLevel.title)

@@ -150,14 +150,13 @@ struct DashboardView: View {
             }
         } label: {
             HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(theme.blue.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "doc.text")
-                        .sproutlyScaledFont(19, relativeTo: .body)
-                        .foregroundStyle(theme.blueText)
-                }
+                ScaledIconDisc(
+                    systemImage: "doc.text",
+                    fill: Theme.iconHalo(for: theme.isNightMode),
+                    tint: theme.blueText,
+                    diameter: 44,
+                    glyphSize: 19
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Report for your visit")

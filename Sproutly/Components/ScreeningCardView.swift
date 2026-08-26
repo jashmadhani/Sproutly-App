@@ -50,15 +50,11 @@ struct ScreeningCardView: View {
             : Theme.accentBlueText(for: nightMode)
         
         return HStack(alignment: .top, spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(cardColor.opacity(0.12))
-                    .frame(width: 40, height: 40)
-                
-                Image(systemName: screening.icon)
-                    .sproutlyScaledFont(18, relativeTo: .body)
-                    .foregroundStyle(glyphColor)
-            }
+            ScaledIconDisc(
+                systemImage: screening.icon,
+                fill: cardColor.opacity(0.12),
+                tint: glyphColor
+            )
             
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {

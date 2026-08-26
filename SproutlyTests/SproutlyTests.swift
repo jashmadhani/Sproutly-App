@@ -2096,6 +2096,41 @@ final class UIRegressionTests: XCTestCase {
         }
     }
 
+    // Eight places drew a glyph on a disc; four pinned the disc with a fixed
+    // `.frame(width:)` while the glyph used `sproutlyScaledFont`, so at
+    // accessibility sizes the icon grew out of its own ornament. `ScaledIconDisc`
+    // keeps them in step — nothing may hand-roll the pair again.
+    func testNoViewPairsAScaledGlyphWithAFixedDisc() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            // Theme owns ScaledIconDisc, which is the correct implementation.
+            if url.lastPathComponent == "Theme.swift" { continue }
+            let lines = try String(contentsOf: url, encoding: .utf8)
+                .components(separatedBy: .newlines)
+
+            for (index, line) in lines.enumerated() {
+                guard line.contains(".frame(width:"),
+                      line.range(of: #"\.frame\(width:\s*\d+"#, options: .regularExpression) != nil
+                else { continue }
+
+                let before = lines[max(0, index - 3)...index].joined(separator: "\n")
+                let after = lines[index..<min(lines.count, index + 7)].joined(separator: "\n")
+                guard before.contains("Circle()") || before.contains("RoundedRectangle") else { continue }
+                guard after.contains("Image(systemName") else { continue }
+
+                XCTAssertFalse(
+                    after.contains("sproutlyScaledFont"),
+                    "\(url.lastPathComponent):\(index + 1) — scaled glyph in a fixed disc; use ScaledIconDisc"
+                )
+            }
+        }
+    }
+
     // Measured on a render: the day bronze is 2.76:1 on the card and 2.15:1 on
     // the background — below even the 3:1 WCAG asks of a meaningful glyph. Any
     // gold a parent has to *see* must use the text variant.

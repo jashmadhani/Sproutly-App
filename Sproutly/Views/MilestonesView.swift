@@ -364,15 +364,13 @@ struct MilestonesView: View {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(category.color(for: theme.isNightMode).opacity(0.12))
-                            .frame(width: 36, height: 36)
-
-                        Image(systemName: category.icon)
-                            .font(.system(size: 16))
-                            .foregroundStyle(category.color(for: theme.isNightMode))
-                    }
+                    ScaledIconDisc(
+                        systemImage: category.icon,
+                        fill: category.color(for: theme.isNightMode).opacity(0.12),
+                        tint: category.color(for: theme.isNightMode),
+                        diameter: 36,
+                        glyphSize: 16
+                    )
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(category.gentleLabel)

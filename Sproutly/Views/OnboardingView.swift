@@ -469,15 +469,12 @@ private extension OnboardingView {
     // Helper: Compact How-It-Works row
     func howItWorksRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(theme.blue.opacity(0.12))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: icon)
-                    .sproutlyScaledFont(18, relativeTo: .body)
-                    .foregroundStyle(theme.blueText)
-            }
+            ScaledIconDisc(
+                systemImage: icon,
+                fill: Theme.iconHalo(for: theme.isNightMode),
+                tint: theme.blueText,
+                diameter: 44
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

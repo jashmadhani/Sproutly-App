@@ -897,10 +897,48 @@ struct FormRow<Value: View>: View {
     }
 }
 
-/// The header of a Settings feature card: circled glyph, title, one
+/// A glyph on a soft disc, where the disc grows with the glyph.
+///
+/// The app draws this ornament in eight places and four of them were wrong the
+/// same way: the icon used `sproutlyScaledFont` (so it scaled with Dynamic
+/// Type) while the circle behind it was pinned with `.frame(width: 40)`. At
+/// accessibility sizes the glyph grew straight out of the disc it was supposed
+/// to sit inside. `@ScaledMetric` on a unit multiplier keeps the two in step.
+///
+/// The other four were static — neither part scaled — which is safe but leaves
+/// a tiny icon beside tripled text. Those are hero ornaments in fixed layouts
+/// and are left alone deliberately.
+struct ScaledIconDisc: View {
+    let systemImage: String
+    let fill: Color
+    let tint: Color
+    var diameter: CGFloat = 40
+    var glyphSize: CGFloat = 18
+
+    /// Scales from 1 with the body text style, so `diameter * unit` tracks the
+    /// glyph exactly. A property wrapper can't take an instance parameter,
+    /// which is why this is a multiplier rather than the diameter itself.
+    @ScaledMetric(relativeTo: .body) private var unit: CGFloat = 1
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(fill)
+                .frame(width: diameter * unit, height: diameter * unit)
+
+            Image(systemName: systemImage)
+                .sproutlyScaledFont(glyphSize, relativeTo: .body)
+                .foregroundStyle(tint)
+        }
+        // Decorative — whatever it sits beside carries the meaning.
+        .accessibilityHidden(true)
+    }
+}
+
+/// The header of a feature card: circled glyph, title, one
 /// explanatory line, and a trailing control.
 ///
-/// Extracted because Night Mode and Gentle reminders were hand-rolling the same
+/// Extracted because Night Mode, Gentle reminders and Ask Sproutly were hand-rolling the same
 /// HStack, and it carried two accessibility faults at large text sizes:
 ///
 /// - **The circle now scales with the glyph.** The icon used
@@ -911,15 +949,17 @@ struct FormRow<Value: View>: View {
 ///   those sizes; the text column got narrow enough to hyphenate mid-word
 ///   ("Reduce bright-ness for quiet evenings"). Same `AnyLayout` switch
 ///   `FormRow` already uses.
-struct SettingsFeatureHeader<Control: View>: View {
+struct FeatureCardHeader<Control: View>: View {
     let title: String
     let subtitle: String
     let systemImage: String
     let nightMode: Bool
+    var diameter: CGFloat = 40
+    var glyphSize: CGFloat = 18
+    var subtitleFont: Font = Theme.sproutlyBody
     @ViewBuilder let control: () -> Control
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var circleSize: CGFloat = 40
 
     var body: some View {
         Group {
@@ -946,17 +986,13 @@ struct SettingsFeatureHeader<Control: View>: View {
     }
 
     private var glyph: some View {
-        ZStack {
-            Circle()
-                .fill(Theme.iconHalo(for: nightMode))
-                .frame(width: circleSize, height: circleSize)
-
-            Image(systemName: systemImage)
-                .sproutlyScaledFont(18, relativeTo: .body)
-                .foregroundStyle(Theme.accentBlueText(for: nightMode))
-        }
-        // Decorative: the title beside it already says what this is.
-        .accessibilityHidden(true)
+        ScaledIconDisc(
+            systemImage: systemImage,
+            fill: Theme.iconHalo(for: nightMode),
+            tint: Theme.accentBlueText(for: nightMode),
+            diameter: diameter,
+            glyphSize: glyphSize
+        )
     }
 
     private var labels: some View {
@@ -967,10 +1003,34 @@ struct SettingsFeatureHeader<Control: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(subtitle)
-                .font(Theme.sproutlyBody)
+                .font(subtitleFont)
                 .foregroundStyle(Theme.textSecondary(for: nightMode))
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+extension FeatureCardHeader where Control == EmptyView {
+    /// A header with no trailing control — Ask Sproutly is a title, not a switch.
+    init(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        nightMode: Bool,
+        diameter: CGFloat = 40,
+        glyphSize: CGFloat = 18,
+        subtitleFont: Font = Theme.sproutlyBody
+    ) {
+        self.init(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage,
+            nightMode: nightMode,
+            diameter: diameter,
+            glyphSize: glyphSize,
+            subtitleFont: subtitleFont,
+            control: { EmptyView() }
+        )
     }
 }
 

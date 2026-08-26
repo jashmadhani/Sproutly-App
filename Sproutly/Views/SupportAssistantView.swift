@@ -22,29 +22,18 @@ struct SupportAssistantView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.accentBlue(for: nightMode).opacity(0.12))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "sparkles")
-                        .sproutlyScaledFont(16, relativeTo: .subheadline)
-                        .foregroundStyle(Theme.accentBlueText(for: nightMode))
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Ask Sproutly")
-                        .font(Theme.sproutlyCardTitle)
-                        .foregroundStyle(Theme.textPrimary(for: nightMode))
-
-                    Text("Share a question or concern")
-                        .font(Theme.sproutlyMeta)
-                        .foregroundStyle(Theme.textSecondary(for: nightMode))
-                }
-                
-                Spacer()
-            }
+            // Same header as the Settings feature cards, so the disc scales with
+            // its glyph and the whole thing stacks at accessibility sizes rather
+            // than squeezing the title into a two-word column.
+            FeatureCardHeader(
+                title: "Ask Sproutly",
+                subtitle: "Share a question or concern",
+                systemImage: "sparkles",
+                nightMode: nightMode,
+                diameter: 36,
+                glyphSize: 16,
+                subtitleFont: Theme.sproutlyMeta
+            )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Ask Sproutly, share a question or concern")
             

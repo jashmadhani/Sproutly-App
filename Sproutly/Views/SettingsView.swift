@@ -182,7 +182,7 @@ struct SettingsView: View {
     private var nightModeCard: some View {
         @Bindable var tm = theme
         
-        return SettingsFeatureHeader(
+        return FeatureCardHeader(
             title: "Night Mode",
             subtitle: "Reduce brightness for quiet evenings",
             systemImage: theme.isNightMode ? "moon.stars.fill" : "moon.fill",
@@ -267,7 +267,7 @@ struct SettingsView: View {
             // of thing: one feature, on or off, with a sentence saying what it
             // does. The previous version invented a fourth card idiom for this
             // screen, with its own padding and four shrinking type sizes.
-            SettingsFeatureHeader(
+            FeatureCardHeader(
                 title: "Gentle reminders",
                 subtitle: "At most one a day, in the morning",
                 systemImage: "bell.fill",
