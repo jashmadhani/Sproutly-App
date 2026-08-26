@@ -32,6 +32,14 @@ enum SproutlyNotificationKind: String, CaseIterable, Sendable {
         }
     }
 
+    var settingsIcon: String {
+        switch self {
+        case .dailyNotice: return "sparkles"
+        case .anniversary: return "clock.arrow.circlepath"
+        case .weeklyReflection: return "calendar"
+        }
+    }
+
     var settingsDescription: String {
         switch self {
         case .dailyNotice: return "One idea in the morning"

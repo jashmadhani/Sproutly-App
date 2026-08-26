@@ -177,11 +177,17 @@ struct DashboardView: View {
                     // feature a free parent never sees converts at zero, and
                     // a tap that unexpectedly lands on a paywall is worse than
                     // one that said so first.
-                    Image(systemName: purchases.isPro ? "square.and.arrow.up" : "lock.fill")
-                        .sproutlyRowIcon()
-                        .foregroundStyle(purchases.isPro ? theme.blueText : theme.proGold)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    Group {
+                        if purchases.isPro {
+                            Image(systemName: "square.and.arrow.up")
+                                .sproutlyRowIcon()
+                                .foregroundStyle(theme.blueText)
+                        } else {
+                            ProLockBadge()
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
             }
         }

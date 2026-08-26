@@ -144,10 +144,18 @@ struct SettingsView: View {
     // Icon carries the accent color, text stays neutral — an all-blue label
     // (icon + text) reads as unusually loud for a section header; matches the
     // same helper in OnboardingView so the two form-heavy screens agree.
-    private func fieldLabel(_ text: String, systemImage: String) -> some View {
+    /// - Parameter tint: overrides the accent for the one header that isn't
+    ///   blue. Gold means Sproutly Pro everywhere else in the app — the lock
+    ///   badges, the Pro Features row — so a blue star on the Pro card would
+    ///   have been the only place the mark changed colour.
+    private func fieldLabel(
+        _ text: String,
+        systemImage: String,
+        tint: Color? = nil
+    ) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(theme.blueText)
+                .foregroundStyle(tint ?? theme.blueText)
             Text(text)
                 .foregroundStyle(theme.textSecondary)
         }
@@ -217,34 +225,44 @@ struct SettingsView: View {
     // not repeated here — it lives on the paywall, where it comes from
     // StoreKit's own localised `displayPrice`.
     private var proSection: some View {
-        VStack(spacing: 0) {
+        // Same shape as every other feature card on this screen: a titled
+        // header, then content. It used to be a chevron row that opened the
+        // paywall — which lists these same features — with the list repeated
+        // immediately beneath it, so the same content appeared twice one tap
+        // apart. The list stays (that is the point of C.2: judge the offer
+        // without being sold to) and there is now one way through.
+        VStack(alignment: .leading, spacing: 16) {
+            fieldLabel("Sproutly Pro", systemImage: "star.fill", tint: theme.proGold)
+
+            Text("One payment, yours forever.")
+                .font(Theme.sproutlyBody)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ProFeatureListView()
+
+            Theme.divider(nightMode: theme.isNightMode)
+
             Button {
                 activeSheet = .paywall(.secondChild)
             } label: {
-                settingsRow(
-                    icon: "star.fill",
-                    iconColor: theme.proGold,
-                    title: "Sproutly Pro",
-                    titleColor: theme.text
-                ) { chevron }
+                HStack(spacing: 10) {
+                    Text("See Sproutly Pro")
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(theme.blueText)
+
+                    Spacer(minLength: 0)
+
+                    chevron
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Sproutly Pro")
-            .accessibilityHint("One payment, yours forever")
-
-            Theme.divider(nightMode: theme.isNightMode)
-                .padding(.leading, Theme.cardPadding)
-
-            VStack(alignment: .leading, spacing: 14) {
-                Text("One payment, yours forever.")
-                    .font(Theme.sproutlyBody)
-                    .foregroundStyle(theme.textSecondary)
-
-                ProFeatureListView()
-            }
-            .padding(Theme.cardPadding)
+            .accessibilityLabel("See Sproutly Pro")
+            .accessibilityHint("Opens the purchase page")
         }
-        .groupedCard(nightMode: theme.isNightMode)
+        .warmCard(nightMode: theme.isNightMode)
     }
 
     // MARK: - Notifications
@@ -252,15 +270,37 @@ struct SettingsView: View {
     // Default off, and the master switch is the only thing that can ask for
     // permission. Turning it on is an explicit tap — Sproutly never requests
     // authorization at launch or during onboarding.
+    // Every row here is a `settingsRow`, exactly like Pro Features / App Icon /
+    // About the Data directly below. That is deliberate: the previous version
+    // stacked a title, a subtitle, three sub-titles, three sub-descriptions and
+    // a footnote — four type sizes shrinking down the card, in a container that
+    // padded itself differently from its neighbours. One row shape, one title
+    // size, one footnote. The cadence and the window live in that footnote
+    // rather than as a subtitle under every switch.
     private var notificationsSection: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            // Deliberately the Night Mode card's exact shape — circled icon,
+            // title, one explanatory line, switch — because it is the same kind
+            // of thing: one feature, on or off, with a sentence saying what it
+            // does. The previous version invented a fourth card idiom for this
+            // screen, with its own padding and four shrinking type sizes.
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(theme.blue.opacity(0.12))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: "bell.fill")
+                        .sproutlyScaledFont(18, relativeTo: .body)
+                        .foregroundStyle(theme.blueText)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Gentle reminders")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
 
-                    Text("At most one a day, mornings only.")
+                    Text("At most one a day, in the morning")
                         .font(Theme.sproutlyBody)
                         .foregroundStyle(theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -278,65 +318,56 @@ struct SettingsView: View {
                     nightMode: theme.isNightMode
                 )
                 .accessibilityLabel("Gentle reminders")
-                .accessibilityHint("At most one a day, mornings only")
+                .accessibilityHint("At most one a day, in the morning")
             }
-            .padding(.horizontal, Theme.cardPadding)
-            .frame(minHeight: 52)
 
+            // Rows, not a second tier of titled toggles — the same FormRow the
+            // gestational-weeks picker uses when the prematurity switch opens.
             if notifications.settings.masterEnabled {
-                ForEach(SproutlyNotificationKind.allCases, id: \.self) { kind in
-                    Theme.divider(nightMode: theme.isNightMode)
+                VStack(spacing: 0) {
+                    ForEach(SproutlyNotificationKind.allCases, id: \.self) { kind in
+                        Theme.divider(nightMode: theme.isNightMode)
 
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            // One step below the master row rather than level
-                            // with it — these are its children, and with no
-                            // indentation to carry that the type has to.
-                            Text(kind.settingsTitle)
-                                .font(Theme.sproutlyItemTitle)
-                                .foregroundStyle(theme.text)
-
-                            Text(kind.settingsDescription)
-                                .font(Theme.sproutlyMeta)
-                                .foregroundStyle(theme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer(minLength: 8)
-
-                        SproutlySwitch(
-                            isOn: Binding(
-                                get: { notifications.settings.enabledKinds.contains(kind) },
-                                set: { wanted in
-                                    notifications.setKind(kind, enabled: wanted)
-                                    Task {
-                                        await notifications.reschedule(for: childStore.activeChild)
-                                    }
-                                }
-                            ),
+                        FormRow(
+                            label: kind.settingsTitle,
+                            systemImage: kind.settingsIcon,
                             nightMode: theme.isNightMode
-                        )
-                        .accessibilityLabel(kind.settingsTitle)
+                        ) {
+                            SproutlySwitch(
+                                isOn: Binding(
+                                    get: { notifications.settings.enabledKinds.contains(kind) },
+                                    set: { wanted in
+                                        notifications.setKind(kind, enabled: wanted)
+                                        Task {
+                                            await notifications.reschedule(
+                                                for: childStore.activeChild
+                                            )
+                                        }
+                                    }
+                                ),
+                                nightMode: theme.isNightMode
+                            )
+                            .accessibilityLabel(kind.settingsTitle)
+                            .accessibilityHint(kind.settingsDescription)
+                        }
                     }
-                    .padding(.horizontal, Theme.cardPadding)
-                    .frame(minHeight: 52)
                 }
+                .transition(.opacity)
             }
 
             Theme.divider(nightMode: theme.isNightMode)
 
-            // D.3 — what these are, and just as importantly what they are not.
-            // Aligned to the row text above it, not to the card edge, so the
-            // left margin holds down the whole card.
-            Text("These are reminders to look and remember. They aren't medical guidance, and they aren't an assessment of your child.")
+            // D.3, once, at the same weight as every other footnote.
+            Text("These are reminders to look and remember — not medical guidance, and not an assessment of your child.")
                 .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Theme.cardPadding)
-                .padding(.vertical, 14)
         }
-        .groupedCard(nightMode: theme.isNightMode)
+        .warmCard(nightMode: theme.isNightMode)
+        .animation(
+            Theme.spring(0.4, reduceMotion: reduceMotion),
+            value: notifications.settings.masterEnabled
+        )
     }
 
     private func setNotifications(enabled: Bool) async {
@@ -476,14 +507,16 @@ struct SettingsView: View {
                     Text("Add a child")
                         .font(Theme.sproutlyCardTitle)
                         .foregroundStyle(theme.text)
-                    Spacer()
+
+                    // Beside the label it belongs to, not pinned to the far
+                    // edge of the card where it read as an unrelated glyph.
                     // Only from the second child on — the first is free, so a
                     // lock there would claim something untrue.
                     if !purchases.isPro && !childStore.children.isEmpty {
-                        Image(systemName: "lock.fill")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(theme.proGold)
+                        ProLockBadge()
                     }
+
+                    Spacer(minLength: 0)
                 }
             }
             .buttonStyle(.plain)
@@ -699,13 +732,10 @@ struct SettingsView: View {
                     titleColor: theme.text
                 ) {
                     HStack(spacing: 8) {
+                        // The same lock as every other gated row. A "Pro"
+                        // capsule here was a fifth way of saying one thing.
                         if !purchases.isPro {
-                            Text("Pro")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(theme.proGold)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(theme.proGold.opacity(0.14)))
+                            ProLockBadge()
                         }
                         chevron
                     }

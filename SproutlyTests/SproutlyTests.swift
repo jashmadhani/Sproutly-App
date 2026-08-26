@@ -1569,14 +1569,19 @@ final class MilestoneLogCounterTests: XCTestCase {
 
     func testPromptIsOfferedOnlyAfterThreeGenuineLogsAndOnlyOnce() {
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: NotificationManager.Keys.promptDismissed)
-        defaults.removeObject(forKey: NotificationManager.Keys.hasAsked)
-        defaults.removeObject(forKey: NotificationManager.Keys.authorizationDenied)
-        defer {
-            defaults.removeObject(forKey: NotificationManager.Keys.promptDismissed)
-            defaults.removeObject(forKey: NotificationManager.Keys.hasAsked)
-            defaults.removeObject(forKey: NotificationManager.Keys.authorizationDenied)
-        }
+
+        // Hermetic. The test bundle is hosted *by the app*, so it shares the
+        // app's UserDefaults domain — anything a real run (or a `simctl
+        // defaults write` while debugging) left behind is visible here. The
+        // master switch in particular suppresses the prompt entirely.
+        let ambient = [
+            NotificationManager.Keys.promptDismissed,
+            NotificationManager.Keys.hasAsked,
+            NotificationManager.Keys.authorizationDenied,
+            "sproutly_notify_master"
+        ]
+        for key in ambient { defaults.removeObject(forKey: key) }
+        defer { for key in ambient { defaults.removeObject(forKey: key) } }
 
         // No notification system touched anywhere in this test.
         let manager = NotificationManager(center: nil)
@@ -1786,8 +1791,9 @@ final class ProDiscoverabilityTests: XCTestCase {
             let text = try String(
                 contentsOf: sourceRoot.appendingPathComponent(file), encoding: .utf8
             )
+            // The shared badge, or the glyph inside the badge itself.
             XCTAssertTrue(
-                text.contains("lock.fill"),
+                text.contains("ProLockBadge()") || text.contains("lock.fill"),
                 "\(file) gates a feature without showing a lock"
             )
         }
@@ -1874,8 +1880,8 @@ final class DisclaimerTests: XCTestCase {
     // D.3 — the notification disclaimer.
     func testNotificationDisclaimerIsPresentAndNotMedical() throws {
         let text = try source("Sproutly/Views/SettingsView.swift")
-        XCTAssertTrue(text.contains("aren't medical guidance"))
-        XCTAssertTrue(text.contains("aren't an assessment of your child"))
+        XCTAssertTrue(text.contains("not medical guidance"))
+        XCTAssertTrue(text.contains("not an assessment of your child"))
     }
 
     // D.4 — all three sources named, and no implied endorsement.
@@ -2062,6 +2068,52 @@ final class UIRegressionTests: XCTestCase {
                 "\(url.lastPathComponent) overrides system tracking"
             )
         }
+    }
+
+    // There were five ways of saying "this is Pro": a 19pt gold lock, two
+    // caption2 locks in different colours, a footnote grey lock, and a "Pro"
+    // text capsule. One mark now, and no view may hand-roll another.
+    func testEveryProAffordanceUsesTheSharedBadge() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            // The badge itself is the one place the glyph may be named.
+            if url.lastPathComponent == "ProLockBadge.swift" { continue }
+            let text = try String(contentsOf: url, encoding: .utf8)
+
+            for line in text.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.hasPrefix("//") else { continue }
+                XCTAssertFalse(
+                    line.contains("Image(systemName: \"lock.fill\")"),
+                    "\(url.lastPathComponent) draws its own lock instead of ProLockBadge"
+                )
+            }
+        }
+    }
+
+    // Settings listed every Pro feature inline *and* opened a paywall that
+    // lists the same features, one tap apart.
+    func testSettingsDoesNotDuplicateThePaywallsFeatureList() throws {
+        let settings = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/SettingsView.swift"),
+            encoding: .utf8
+        )
+
+        // The shared list appears exactly once on this screen...
+        let occurrences = settings.components(separatedBy: "ProFeatureListView()").count - 1
+        XCTAssertEqual(occurrences, 1, "the Pro feature list is rendered \(occurrences) times")
+
+        // ...and there is one route to the paywall from the Pro card, not a
+        // chevron row duplicating what sits directly beneath it.
+        XCTAssertTrue(settings.contains("See Sproutly Pro"))
     }
 
     // Two of four tabs faded content under the status bar and two did not, so a

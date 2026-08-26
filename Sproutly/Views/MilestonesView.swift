@@ -219,8 +219,7 @@ struct MilestonesView: View {
                     // surprise. Matches the "Pro" badge convention used on
                     // the App Icon row in Settings.
                     if !purchases.isPro {
-                        Image(systemName: "lock.fill")
-                            .font(.caption2.weight(.semibold))
+                        ProLockBadge()
                     }
                 }
                 .foregroundStyle(theme.blueText)
@@ -625,8 +624,7 @@ struct MilestonesView: View {
                         Text("Add a photo")
                             .font(Theme.sproutlyCardTitle)
                         Spacer()
-                        Image(systemName: "lock.fill")
-                            .font(Theme.sproutlyMeta)
+                        ProLockBadge()
                     }
                     .foregroundStyle(theme.textSecondary)
                     .padding(.horizontal, 14)
