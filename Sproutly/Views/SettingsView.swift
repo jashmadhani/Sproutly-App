@@ -87,14 +87,7 @@ struct SettingsView: View {
             .coordinateSpace(name: "settingsScroll")
             .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
             .scrollDismissesKeyboard(.interactively)
-            .mask(
-                VStack(spacing: 0) {
-                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 80)
-                    Color.black
-                }
-                .ignoresSafeArea()
-            )
+            .scrollEdgeFade()
             
             // Compact header
             VStack {
@@ -293,12 +286,14 @@ struct SettingsView: View {
             if notifications.settings.masterEnabled {
                 ForEach(SproutlyNotificationKind.allCases, id: \.self) { kind in
                     Theme.divider(nightMode: theme.isNightMode)
-                        .padding(.leading, Theme.cardPadding)
 
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
+                            // One step below the master row rather than level
+                            // with it — these are its children, and with no
+                            // indentation to carry that the type has to.
                             Text(kind.settingsTitle)
-                                .font(Theme.sproutlyFieldValue)
+                                .font(Theme.sproutlyItemTitle)
                                 .foregroundStyle(theme.text)
 
                             Text(kind.settingsDescription)
@@ -329,16 +324,17 @@ struct SettingsView: View {
             }
 
             Theme.divider(nightMode: theme.isNightMode)
-                .padding(.leading, Theme.cardPadding)
 
             // D.3 — what these are, and just as importantly what they are not.
+            // Aligned to the row text above it, not to the card edge, so the
+            // left margin holds down the whole card.
             Text("These are reminders to look and remember. They aren't medical guidance, and they aren't an assessment of your child.")
                 .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.cardPadding)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
         }
         .groupedCard(nightMode: theme.isNightMode)
     }

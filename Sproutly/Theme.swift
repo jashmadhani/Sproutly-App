@@ -755,6 +755,23 @@ extension View {
         modifier(UnderlineField(nightMode: nightMode, isFocused: isFocused))
     }
 
+    /// Fades scrolling content out beneath the status bar.
+    ///
+    /// Settings and Assistant already did this; Dashboard and Milestones did
+    /// not, so on those two a card's text collided with the clock at the top of
+    /// the screen. Extracted rather than copied a third and fourth time so the
+    /// four tabs cannot drift apart again.
+    func scrollEdgeFade() -> some View {
+        mask(
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 80)
+                Color.black
+            }
+            .ignoresSafeArea()
+        )
+    }
+
     func warmCard(nightMode: Bool) -> some View {
         self
             .padding(Theme.cardPadding)

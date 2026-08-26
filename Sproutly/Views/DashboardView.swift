@@ -96,6 +96,7 @@ struct DashboardView: View {
                 .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeFade()
         }
         .onAppear {
             if let active = childStore.activeChild {

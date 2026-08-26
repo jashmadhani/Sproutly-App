@@ -71,15 +71,25 @@ final class DevelopmentObserverTests: XCTestCase {
 }
 
 final class DashboardViewModelTests: XCTestCase {
+    // The view model recomputes behind a hash signature rather than reactively,
+    // so a field changing without the *count* changing has to be caught.
+    //
+    // The child is twelve months old rather than newborn: nothing is flagged
+    // below `concernFloorMonths` at all now, so a newborn would have made this
+    // pass for the wrong reason. See UIRegressionTests.
     func testUpdateRecomputesWhenMilestoneFieldsChangeWithoutCountChange() {
-        let milestone = Milestone(title: "Walks", category: "Gross Motor", ageMonth: 0)
-        let child = Child(birthDate: Date())
+        let milestone = Milestone(title: "Walks", category: "Gross Motor", ageMonth: 12)
+        let child = Child(
+            birthDate: Calendar.current.date(byAdding: .month, value: -12, to: Date())!
+        )
         let viewModel = DashboardViewModel()
 
         viewModel.update(milestones: [milestone], child: child)
         XCTAssertEqual(viewModel.domainConcerns.count, 0)
 
-        milestone.ageMonth = -2
+        // Same milestone, same count — only the expected age moves, which pulls
+        // it inside the flagging window.
+        milestone.ageMonth = 9
         viewModel.update(milestones: [milestone], child: child)
 
         XCTAssertEqual(viewModel.flaggedMilestones.count, 1)
@@ -1948,6 +1958,161 @@ final class DisclaimerTests: XCTestCase {
         let project = try source("project.yml")
         XCTAssertTrue(project.contains("- path: Sproutly"))
         XCTAssertFalse(project.contains("AppStore"))
+    }
+}
+
+// MARK: - UI Regressions
+
+@MainActor
+final class UIRegressionTests: XCTestCase {
+
+    private var container: ModelContainer!
+
+    private func makeChild(ageMonths: Int) throws -> Child {
+        let schema = Schema(versionedSchema: SproutlyCurrentSchema.self)
+        container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let birth = Calendar.current.date(byAdding: .month, value: -ageMonths, to: Date())!
+        let child = Child(name: "Aanya", birthDate: birth)
+        container.mainContext.insert(child)
+        DataSeeder.seed(for: child, in: container.mainContext)
+        return child
+    }
+
+    // Adding the two-month band meant a four-month-old satisfied
+    // `age >= ageMonth + 2` against it, and their parent — days into the app —
+    // was shown a Development Focus card offering Early Intervention.
+    func testNoConcernSurfacesForABabyBelowTheFloor() throws {
+        for age in [2, 4, 6, 8] {
+            let child = try makeChild(ageMonths: age)
+            let viewModel = DashboardViewModel()
+            viewModel.update(milestones: child.sortedMilestones, child: child)
+
+            XCTAssertTrue(
+                viewModel.flaggedMilestones.isEmpty,
+                "a \(age)-month-old was flagged"
+            )
+            XCTAssertFalse(
+                viewModel.hasDevelopmentFocus,
+                "a \(age)-month-old's parent was shown Development Focus"
+            )
+        }
+    }
+
+    // The floor must not silence a genuine signal for an older child.
+    func testConcernStillSurfacesAtAndAboveTheFloor() throws {
+        let child = try makeChild(ageMonths: 14)
+        let viewModel = DashboardViewModel()
+        viewModel.update(milestones: child.sortedMilestones, child: child)
+
+        XCTAssertGreaterThanOrEqual(DashboardViewModel.concernFloorMonths, 9)
+        XCTAssertFalse(viewModel.flaggedMilestones.isEmpty)
+        XCTAssertTrue(viewModel.hasDevelopmentFocus)
+    }
+
+    // The name gate keyed on "is this the last step", which stopped being the
+    // profile step the moment a sixth step existed — so a parent could continue
+    // with an empty field and land on a screen addressed to "your little one".
+    func testOnboardingRequiresANameBeforeLeavingTheProfileStep() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sproutly/Views/OnboardingView.swift"),
+            encoding: .utf8
+        )
+
+        // Gated on reaching the profile step, and on the trimmed name.
+        XCTAssertTrue(source.contains("step >= Self.profileStepIndex && trimmedName.isEmpty"))
+        XCTAssertTrue(source.contains(".disabled(isNameMissing || isProcessing)"))
+
+        // The old, broken shape must not come back.
+        XCTAssertFalse(source.contains("step == totalSteps - 1 && childName.isEmpty"))
+
+        // And the backfill step is no longer a one-way door.
+        XCTAssertTrue(source.contains("goBack()"))
+    }
+
+    // A blank or whitespace-only name must never reach a Child.
+    func testWhitespaceOnlyNameFallsBackRatherThanRenderingEmpty() {
+        XCTAssertEqual(Child(name: "   ", birthDate: Date()).displayName, "Your little one")
+        XCTAssertEqual(Child(name: "", birthDate: Date()).displayName, "Your little one")
+        XCTAssertEqual(Child(name: " Aanya ", birthDate: Date()).displayName, "Aanya")
+    }
+
+    // Uppercase, letter-spaced labels appeared nowhere else in the app; the two
+    // in the daily card read as though pasted in from another product.
+    func testNoUppercaseTrackedLabelsAnywhere() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly")
+
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        for case let url as URL in files ?? .init() where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertFalse(
+                text.contains("textCase(.uppercase)"),
+                "\(url.lastPathComponent) uses an uppercase label"
+            )
+            XCTAssertFalse(
+                text.contains(".tracking("),
+                "\(url.lastPathComponent) overrides system tracking"
+            )
+        }
+    }
+
+    // Two of four tabs faded content under the status bar and two did not, so a
+    // card's text collided with the clock on Dashboard and Milestones.
+    func testEveryScrollingTabFadesContentUnderTheStatusBar() throws {
+        let views = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly/Views")
+
+        for file in ["DashboardView.swift", "MilestonesView.swift",
+                     "SettingsView.swift", "AssistantView.swift"] {
+            let text = try String(
+                contentsOf: views.appendingPathComponent(file), encoding: .utf8
+            )
+            XCTAssertTrue(
+                text.contains("scrollEdgeFade()") || text.contains(".mask("),
+                "\(file) has no scroll edge effect"
+            )
+        }
+    }
+
+    // `.underlineField` draws its own rule; a `Theme.divider` immediately after
+    // it rendered two parallel lines 8pt apart.
+    func testNoDividerImmediatelyFollowsAnUnderlinedField() throws {
+        let views = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly/Views")
+
+        for file in ["AddChildSheet.swift", "OnboardingView.swift", "SettingsView.swift"] {
+            let text = try String(
+                contentsOf: views.appendingPathComponent(file), encoding: .utf8
+            )
+            let lines = text.components(separatedBy: .newlines)
+
+            for (index, line) in lines.enumerated() where line.contains("underlineField(") {
+                // Look at the next few meaningful lines for a divider before any
+                // other content intervenes.
+                let window = lines[index..<min(index + 10, lines.count)]
+                var sawContent = false
+                for next in window.dropFirst() {
+                    let trimmed = next.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty || trimmed.hasPrefix("//") || trimmed.hasPrefix(".") { continue }
+                    if trimmed.contains("Theme.divider") && !sawContent {
+                        XCTFail("\(file):\(index + 1) — divider directly under an underlined field")
+                    }
+                    sawContent = true
+                }
+            }
+        }
     }
 }
 

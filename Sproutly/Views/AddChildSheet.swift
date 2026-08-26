@@ -72,8 +72,12 @@ struct AddChildSheet: View {
                             // As a row the pill becomes the value on the right,
                             // which is both the system's own pattern and the same
                             // shape as the Gestational Age row below.
-                            Theme.divider(nightMode: theme.isNightMode)
-
+                            //
+                            // No divider above this row: `.underlineField` on the
+                            // name already draws one, and a second rule 8pt below
+                            // it read as a rendering fault rather than a
+                            // separator. One line weight, one line — the row
+                            // below still gets its own separator.
                             FormRow(
                                 label: "Birth Date",
                                 systemImage: "calendar",

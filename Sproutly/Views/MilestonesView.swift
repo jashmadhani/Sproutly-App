@@ -97,6 +97,7 @@ struct MilestonesView: View {
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeFade()
 
             // Full-screen photo zoom. Lives at this level, not inside the row,
             // because it needs to cover the whole screen — a matchedGeometryEffect

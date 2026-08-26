@@ -56,11 +56,15 @@ private extension DailyNoticeCard {
 
     func card(for milestone: Milestone) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Sentence case, section-header weight, no tracking — the same
+            // treatment as "What you've noticed" and "Five areas of growth"
+            // directly below it. The uppercase, letter-spaced version this
+            // replaced was the only such label in the app and read as though it
+            // had been pasted in from a different product.
             Text("Something to notice today")
-                .font(Theme.sproutlyMeta)
-                .foregroundStyle(theme.textSecondary)
-                .textCase(.uppercase)
-                .tracking(0.6)
+                .font(Theme.sproutlySectionHeader)
+                .foregroundStyle(theme.text)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -86,13 +90,19 @@ private extension DailyNoticeCard {
             }
 
             if !milestone.tips.isEmpty {
+                // Meta, not body. The tip is secondary to the milestone title
+                // above it, and at body size it rendered larger than the domain
+                // label it sits under — hierarchy inverted by two type steps.
                 Text(milestone.tips)
-                    .font(Theme.sproutlyBody)
+                    .font(Theme.sproutlyMeta)
                     .foregroundStyle(theme.textSecondary)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // A real control. As a bare label this read as a stray caption
+            // rather than the dismissal it is; every other quiet action in the
+            // app carries the recessed capsule, so it wears one too.
             Button {
                 withAnimation(.easeOut(duration: 0.2)) {
                     DailyCardDismissal.dismiss(for: child.id, on: today)
@@ -100,9 +110,14 @@ private extension DailyNoticeCard {
                 }
             } label: {
                 Text("Not yet")
-                    .font(Theme.sproutlyMeta)
-                    .foregroundStyle(theme.textSecondary)
-                    .padding(.vertical, 6)
+                    .font(Theme.sproutlyItemTitle)
+                    .foregroundStyle(theme.text)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(theme.recessedFill)
+                    )
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -121,10 +136,9 @@ private extension DailyNoticeCard {
     var completionCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Something to notice today")
-                .font(Theme.sproutlyMeta)
-                .foregroundStyle(theme.textSecondary)
-                .textCase(.uppercase)
-                .tracking(0.6)
+                .font(Theme.sproutlySectionHeader)
+                .foregroundStyle(theme.text)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text("You've saved everything here for now")
                 .font(Theme.sproutlyCardTitle)
@@ -132,7 +146,7 @@ private extension DailyNoticeCard {
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("More arrives as \(child.displayName) grows. Anything you notice in the meantime can go in as your own moment.")
-                .font(Theme.sproutlyBody)
+                .font(Theme.sproutlyMeta)
                 .foregroundStyle(theme.textSecondary)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)

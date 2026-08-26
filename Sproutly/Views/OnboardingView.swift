@@ -64,6 +64,17 @@ struct OnboardingView: View {
         childName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // The name is required to *leave the profile step*, not merely to finish the
+    // flow. Gating on "is this the last step" was wrong the moment a sixth step
+    // existed: the profile step stopped being last, the check stopped firing,
+    // and a parent could continue with an empty field — landing on a backfill
+    // screen addressed to "your little one" with no way back.
+    //
+    // Trimmed, so a field holding only spaces doesn't pass.
+    private var isNameMissing: Bool {
+        step >= Self.profileStepIndex && trimmedName.isEmpty
+    }
+
     var body: some View {
         ZStack {
             // Warm background — lightweight, no blur
@@ -523,7 +534,23 @@ private extension OnboardingView {
     // twelve boxes on their first minute in the app has not done anything wrong,
     // and the button that says so must not read as the lesser choice.
     var backfillButtons: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
+            // Back belongs here like on every other step. Without it this screen
+            // was a one-way door — a parent who mistyped the birth date could
+            // only get out through Settings.
+            Button {
+#if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
+                goBack()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .foregroundStyle(theme.textSecondary)
+            }
+            .buttonStyle(SoftCapsuleStyle(baseColor: theme.blue, nightMode: theme.isNightMode))
+            .disabled(isProcessing)
+            .accessibilityLabel("Back")
+
             Button {
                 guard !isProcessing else { return }
 #if os(iOS)
@@ -540,7 +567,7 @@ private extension OnboardingView {
             .buttonStyle(SoftCapsuleStyle(baseColor: theme.green, nightMode: theme.isNightMode))
             .disabled(isProcessing)
 
-            Spacer()
+            Spacer(minLength: 0)
 
             Button {
                 guard !isProcessing else { return }
@@ -622,8 +649,8 @@ private extension OnboardingView {
                     nightMode: theme.isNightMode
                 )
             )
-            .disabled((step == totalSteps - 1 && childName.isEmpty) || isProcessing)
-            .opacity((step == totalSteps - 1 && childName.isEmpty) ? 0.5 : 1)
+            .disabled(isNameMissing || isProcessing)
+            .opacity(isNameMissing ? 0.5 : 1)
         }
     }
 

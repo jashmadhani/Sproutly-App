@@ -35,6 +35,14 @@ final class DashboardViewModel {
     private(set) var upcomingBandMonth: Int = 2
     private(set) var upcomingMilestones: [Milestone] = []
 
+    /// No concern surfaces below this age, in any form.
+    ///
+    /// Matches the floor `DevelopmentObserver.classifyStatus` already applies to
+    /// `.worthDiscussing`, and the age at which the AAP's own developmental
+    /// screening begins. A younger baby has a wide, ordinary range of timing and
+    /// nothing an app should be remarking on.
+    static let concernFloorMonths = 9
+
     // skip only when all inputs that affect derived state are unchanged
     private var lastMilestoneSignature: Int?
     private var lastCorrectedAge: Int = -1
@@ -105,11 +113,21 @@ final class DashboardViewModel {
 
         // The list that raises the Development Focus card. An excluded band must
         // never reach it: shipping new content is not evidence about a child.
-        flaggedMilestones = milestones.filter { m in
-            !m.isCompleted
-                && age >= m.ageMonth + 2
-                && !excluded.contains(m.ageMonth)
-        }
+        //
+        // Below the floor nothing is flagged at all. The `+ 2` window alone was
+        // written when the catalog started at six months; once a two-month band
+        // existed, a *four-month-old* satisfied `4 >= 2 + 2` and their parent —
+        // days into the app, having saved three things — was shown a Development
+        // Focus card offering Early Intervention. `DevelopmentObserver` already
+        // refuses `.worthDiscussing` below nine months for exactly this reason,
+        // and AAP screening starts there too; the two now agree.
+        flaggedMilestones = age < Self.concernFloorMonths
+            ? []
+            : milestones.filter { m in
+                !m.isCompleted
+                    && age >= m.ageMonth + 2
+                    && !excluded.contains(m.ageMonth)
+            }
 
         hasDevelopmentFocus = flaggedMilestones.count >= 2
 
