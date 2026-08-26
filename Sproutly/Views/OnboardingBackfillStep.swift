@@ -113,8 +113,13 @@ struct OnboardingBackfillStep: View {
                     domainSection(category: group.category, items: group.items)
                 }
             }
-            .padding()
-            .padding(.bottom, 8)
+            // The Milestones tab's margins, exactly. This screen showed the
+            // same milestones in the same cards but sat them 16pt from the
+            // screen edge instead of 20, so the cards were visibly wider than
+            // every other card in the app.
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
@@ -147,27 +152,42 @@ private extension OnboardingBackfillStep {
 
 private extension OnboardingBackfillStep {
 
+    /// Structurally identical to `MilestonesView.domainSection`, because it is
+    /// the same thing: a domain header over milestone rows.
+    ///
+    /// The nesting matters and is easy to get wrong. `warmCard` already insets
+    /// its content by `cardPadding`, and the Milestones version then pads the
+    /// header and the row stack by another 16 — so header text and row edges
+    /// both land 32pt inside the card. This screen previously let them sit at
+    /// 16, which is why the rows looked like they were hugging the card wall.
     func domainSection(category: MilestoneCategory, items: [BackfillCandidate]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.itemSpacing) {
-            HStack(spacing: 10) {
-                // Decorative — the label beside it carries the meaning, which is
-                // why a domain surface colour is legitimate here.
-                Image(systemName: category.icon)
-                    .sproutlyScaledFont(16, relativeTo: .subheadline)
-                    .foregroundStyle(category.color(for: theme.isNightMode))
-                    .frame(width: 24)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                ScaledIconDisc(
+                    systemImage: category.icon,
+                    fill: category.color(for: theme.isNightMode).opacity(0.12),
+                    tint: category.color(for: theme.isNightMode),
+                    diameter: 36,
+                    glyphSize: 16
+                )
 
                 Text(category.gentleLabel)
                     .font(Theme.sproutlyCardTitle)
                     .foregroundStyle(theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 0)
             }
+            .padding(16)
             .accessibilityAddTraits(.isHeader)
 
-            ForEach(items) { candidate in
-                row(candidate)
+            VStack(spacing: Theme.itemSpacing) {
+                ForEach(items) { candidate in
+                    row(candidate)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .warmCard(nightMode: theme.isNightMode)

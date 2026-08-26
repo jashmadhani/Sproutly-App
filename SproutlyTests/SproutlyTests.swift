@@ -2096,6 +2096,44 @@ final class UIRegressionTests: XCTestCase {
         }
     }
 
+    // The backfill step shows the same milestones, in the same cards, as the
+    // Milestones tab — so it must use the same margins. It used a 16pt screen
+    // inset against Milestones' 20, and let rows sit 16pt inside the card where
+    // Milestones puts them at 32 (16 from `warmCard`, 16 of its own). Measured
+    // on a render after the fix, both screens put the card edge at 19.6pt and
+    // the row edge at 50.8pt.
+    func testBackfillStepUsesTheSameCardMarginsAsMilestones() throws {
+        let views = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sproutly/Views")
+
+        let backfill = try String(
+            contentsOf: views.appendingPathComponent("OnboardingBackfillStep.swift"),
+            encoding: .utf8
+        )
+        let milestones = try String(
+            contentsOf: views.appendingPathComponent("MilestonesView.swift"),
+            encoding: .utf8
+        )
+
+        // Same screen margin.
+        for source in [("backfill", backfill), ("milestones", milestones)] {
+            XCTAssertTrue(
+                source.1.contains(".padding(.horizontal, 20)"),
+                "\(source.0) does not use the app's 20pt screen margin"
+            )
+        }
+        XCTAssertFalse(
+            backfill.contains(".padding()\n"),
+            "the backfill step is back on the default 16pt inset"
+        )
+
+        // Same inset for rows inside the card, on top of warmCard's own.
+        XCTAssertTrue(backfill.contains(".padding(.horizontal, 16)"))
+        XCTAssertTrue(backfill.contains(".warmCard(nightMode:"))
+    }
+
     // Three `SoftCapsuleStyle` buttons need ~413pt of content on a 393pt phone,
     // so the backfill row clipped Back off the leading edge on a real device.
     // Back is a bare chevron now, and the row stacks at accessibility sizes.
