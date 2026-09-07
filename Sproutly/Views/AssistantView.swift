@@ -24,6 +24,11 @@ struct AssistantView: View {
     private var isCompactHeader: Bool { scrollOffset < -10 }
     private var correctedAge: Int { max(0, child.calculateCorrectedAge()) }
 
+    // Bands this child was never shown in time. Every other surface that judges
+    // progress excludes them; the assistant did not, so a catalog update could
+    // make this screen contradict the Dashboard about the same child.
+    private var excludedBands: Set<Int> { CatalogBaseline.excludedBands(for: child.id) }
+
     var body: some View {
         ZStack(alignment: .top) {
             AmbientBackground(nightMode: theme.isNightMode)
@@ -122,6 +127,7 @@ struct AssistantView: View {
         SupportAssistantView(
             milestones: milestones,
             correctedAge: correctedAge,
+            excludedBands: excludedBands,
             nightMode: theme.isNightMode
         )
     }
