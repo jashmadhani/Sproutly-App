@@ -79,8 +79,8 @@ final class DashboardViewModel {
         correctedAge = age
         excludedBands = excluded
 
-        let brackets = Array(Set(milestones.filter { !$0.isUserCreated }.map(\.ageMonth))).sorted()
-        let resolved = Self.resolveTargetAge(
+        let brackets = MilestoneStage.brackets(from: milestones)
+        let resolved = MilestoneStage.resolveTargetAge(
             milestones: milestones,
             brackets: brackets,
             correctedAge: age,
@@ -162,33 +162,4 @@ final class DashboardViewModel {
     // MARK: - Private Helpers
 
     // The most recent band the child has actually reached and not yet filled in.
-    //
-    // Returns nil when they have reached none of them — a baby younger than the
-    // first band the catalog covers. The previous version fell back to the
-    // *nearest* bracket, which for a three-week-old resolved forward to a band
-    // they had not arrived at and rendered "0 of 10" against it.
-    private static func resolveTargetAge(
-        milestones: [Milestone],
-        brackets: [Int],
-        correctedAge: Int,
-        excludedBands: Set<Int>
-    ) -> Int? {
-        guard !milestones.isEmpty else { return nil }
-
-        let reached = brackets.filter { $0 <= correctedAge && !excludedBands.contains($0) }
-        guard !reached.isEmpty else { return nil }
-
-        for bracket in reached.reversed() {
-            let items = milestones.filter { $0.ageMonth == bracket }
-            guard !items.isEmpty else { continue }
-            let done = items.filter(\.isCompleted).count
-            if Double(done) / Double(items.count) <= 0.6 {
-                return bracket
-            }
-        }
-
-        // Everything reached is well covered — stay on the most recent band
-        // rather than jumping forward to one they have not arrived at.
-        return reached.last
-    }
 }
