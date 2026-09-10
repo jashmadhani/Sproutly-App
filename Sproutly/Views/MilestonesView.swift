@@ -82,14 +82,28 @@ struct MilestonesView: View {
 
     private var correctedAge: Int { max(0, child.calculateCorrectedAge()) }
 
-    // Derived from the standard set only. A parent-authored moment is stamped with
-    // the child's current age, and letting those into this calculation would pull
-    // the stage away from the real milestone bands (6, 9, 12, …).
-    private var targetAgeMonth: Int {
-        let standardAges = Set(milestones.filter { !$0.isUserCreated }.map(\.ageMonth))
-        guard !standardAges.isEmpty else { return 6 }
-        return standardAges.min(by: { abs($0 - correctedAge) < abs($1 - correctedAge) }) ?? 6
+    private var brackets: [Int] { MilestoneStage.brackets(from: milestones) }
+
+    // Shared with the dashboard so the two tabs cannot disagree about what the
+    // same child is working on. This used to pick the band *nearest* the child's
+    // age, which is a different question: a ten-day-old resolved forward to the
+    // two month band and saw it under "This Stage", right after onboarding had
+    // promised Sproutly starts at two months.
+    private var resolvedStage: Int? {
+        MilestoneStage.resolveTargetAge(
+            milestones: milestones,
+            brackets: brackets,
+            correctedAge: correctedAge,
+            excludedBands: CatalogBaseline.excludedBands(for: child.id)
+        )
     }
+
+    /// False until the child reaches the first band the catalog covers.
+    private var hasReachedFirstBand: Bool { resolvedStage != nil }
+
+    /// Below the first band this is the band that is *coming*, and the list is
+    /// labelled as such rather than presented as due now.
+    private var targetAgeMonth: Int { resolvedStage ?? brackets.first ?? 6 }
 
     private var filteredMilestones: [Milestone] {
         switch selectedFilter {
@@ -118,6 +132,9 @@ struct MilestonesView: View {
                 VStack(spacing: Theme.sectionSpacing) {
                     headerSection
                     filterPicker
+                    if selectedFilter == .thisStage && !hasReachedFirstBand {
+                        comingUpNotice
+                    }
                     domainGroups
                 }
                 .padding(.horizontal, 20)
@@ -277,6 +294,20 @@ struct MilestonesView: View {
     // the adjustment is named in words rather than jargon.
     private var ageDescription: String {
         let months = correctedAge
+
+        // "0 months" reads as an error to the parent of a ten-day-old, and the
+        // dashboard greets that same child as "1 week old". Below the first
+        // month the label follows weeks, the way `Child.humanReadableAge` does.
+        // A premature baby is not given a week count here: their corrected age
+        // is the number every milestone decision uses, and pairing a
+        // chronological week count with "adjusted for arriving early" states two
+        // different ages in one line.
+        if months == 0 {
+            if child.isPremature { return "Not yet 1 month, adjusted for arriving early" }
+            let weeks = child.chronologicalAgeWeeks
+            return weeks == 0 ? "Just arrived" : "\(weeks) week\(weeks == 1 ? "" : "s") old"
+        }
+
         let base: String
         if months < 24 {
             base = "\(months) month\(months == 1 ? "" : "s")"
@@ -288,6 +319,26 @@ struct MilestonesView: View {
                 : "\(years)y \(rem)m"
         }
         return child.isPremature ? "\(base), adjusted for arriving early" : base
+    }
+
+    // Mirrors the dashboard's coming-soon card. A parent three weeks in should
+    // close this tab feeling nothing is missing, so there is no count and no
+    // progress here — only what is ahead, named as ahead.
+    private var comingUpNotice: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Coming up at \(targetAgeMonth) months")
+                .font(Theme.sproutlyCardTitle)
+                .foregroundStyle(theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("There is nothing to save yet, and that is exactly right. These are the ones you will start noticing around then.")
+                .font(Theme.sproutlyBody)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Filter Picker

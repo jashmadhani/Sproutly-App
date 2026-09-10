@@ -104,7 +104,13 @@ enum AssistantComposer {
             // Lifestyle and must not suggest what a sign means. What it can do
             // is not waste the moment.
             context = "Sproutly is about developmental milestones, so it cannot help with this one."
-            note = "What you are describing is worth speaking to a doctor about today rather than waiting for the next visit. If you cannot reach your pediatrician, an urgent care service or your local emergency number is the right next step."
+            // Option C. The earlier wording said the described sign was worth a
+            // call "today", which is an assessment of how serious it is, and
+            // assessing a symptom is the one thing a Lifestyle app must not do.
+            // The urgency now attaches to the parent's own worry instead: they
+            // are told not to sit on it, without the app claiming to know what
+            // it is. The routing is unchanged.
+            note = "Anything about your child's physical health is a question for your pediatrician. If you are worried about this, please don't wait for the next scheduled visit — call them today, and if you cannot reach them, an urgent care service or your local emergency number is the right next step."
 
         case .healthSymptom:
             let subject = intent.scopeTerm.map { "questions about \($0) are" } ?? "this is"
