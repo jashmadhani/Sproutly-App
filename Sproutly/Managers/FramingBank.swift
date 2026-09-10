@@ -85,8 +85,20 @@ enum FramingBank {
         "You see your child more than anyone else does. Writing down what you notice gives you something specific to look back on."
     ]
 
-    /// Shown when the question carried nothing to work with. Asking for a little
-    /// more is more honest than answering confidently about nothing.
-    static let needsMore =
-        "Tell me a bit more and the answer can be more specific. What your child is doing, or not doing yet, is enough to go on."
+    /// Shown when the question carried nothing to work with.
+    ///
+    /// Naming real examples rather than asking an open "tell me more". A parent
+    /// cannot guess that this only covers milestones, and a question that gets
+    /// nothing useful back is the fastest way to stop them asking again.
+    static let needsMore = """
+        Tell me a bit more and the answer can be more specific. Sproutly follows the five areas of \
+        development, so questions like "is she pointing at things yet", "what can I do to help him \
+        walk", or "when do children start putting words together" are the kind it can answer about \
+        your own child.
+        """
+
+    /// Offered alongside `needsMore`, so a question with nothing in it still
+    /// leaves the parent with something to do.
+    static let standingPediatricNote =
+        "If anything is on your mind, your pediatrician is the right person to ask. Well-child visits are a good time for it, and you do not have to wait for one."
 }

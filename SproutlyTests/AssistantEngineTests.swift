@@ -349,3 +349,185 @@ final class ActivityBankTests: XCTestCase {
         XCTAssertGreaterThan(ActivityBank.general.count, 3)
     }
 }
+
+// MARK: - Scope
+
+/// Sproutly covers developmental milestones and nothing else, but the input
+/// invites anything. These lock the behaviour for questions it is not for.
+final class QuestionScopeTests: XCTestCase {
+
+    /// The question that prompted this. Pale or clay-coloured stool is a
+    /// recognised reason to have a baby seen, and the engine answered it with a
+    /// line about how writing things down is useful.
+    func testGreyStoolIsRoutedUrgently() {
+        let response = AssistantEngine.respond(
+            to: "Why is my child's poop grey?", milestones: catalogFixture(), correctedAge: 6
+        )
+        XCTAssertEqual(response.scope, .urgentHealthSymptom)
+        XCTAssertNotNil(response.pediatricNote)
+        XCTAssertTrue(response.pediatricNote!.contains("today"))
+        XCTAssertTrue(response.activities.isEmpty, "an urgent redirect must not offer play ideas")
+        XCTAssertTrue(response.cited.isEmpty)
+    }
+
+    func testUrgentSignsAreRecognised() {
+        let urgent = [
+            "there is blood in her nappy",
+            "his lips went blue",
+            "she had a seizure last night",
+            "he is not breathing properly",
+            "she banged her head on the floor",
+            "his skin looks jaundiced"
+        ]
+        for question in urgent {
+            XCTAssertEqual(
+                AssistantEngine.respond(to: question, milestones: catalogFixture(), correctedAge: 12).scope,
+                .urgentHealthSymptom,
+                "not routed urgently: \(question)"
+            )
+        }
+    }
+
+    /// A question mentioning both walking and blood in a nappy is not a walking
+    /// question. Urgency outranks a developmental match outright.
+    func testUrgentSignOutranksADevelopmentalMatch() {
+        let response = AssistantEngine.respond(
+            to: "She isn't walking yet and there was blood in her nappy this morning",
+            milestones: catalogFixture(), correctedAge: 14
+        )
+        XCTAssertEqual(response.scope, .urgentHealthSymptom)
+        XCTAssertNil(response.domain)
+    }
+
+    /// The app is Lifestyle, not Health. It routes; it never says what a sign
+    /// might mean.
+    func testUrgentAnswerNeverDiagnoses() {
+        let response = AssistantEngine.respond(
+            to: "Why is my child's poop grey?", milestones: catalogFixture(), correctedAge: 6
+        )
+        let text = (response.context + " " + (response.pediatricNote ?? "")).lowercased()
+        for word in ["liver", "biliary", "atresia", "jaundice", "infection", "disease",
+                     "condition", "could be", "might be", "sounds like", "probably"] {
+            XCTAssertFalse(text.contains(word), "answer edged into diagnosis with: \(word)")
+        }
+    }
+
+    func testOrdinaryHealthQuestionsAreRedirectedNotAlarmed() {
+        for question in ["he has a rash on his tummy", "she has had a cough for days"] {
+            let response = AssistantEngine.respond(
+                to: question, milestones: catalogFixture(), correctedAge: 12
+            )
+            XCTAssertEqual(response.scope, .healthSymptom, "wrong scope: \(question)")
+            XCTAssertNotNil(response.pediatricNote)
+            XCTAssertFalse(response.pediatricNote!.contains("today"), "ordinary question sounded urgent")
+        }
+    }
+
+    func testParentingTopicsSayWhatTheAppDoesCover() {
+        let response = AssistantEngine.respond(
+            to: "any advice on sleep training?", milestones: catalogFixture(), correctedAge: 12
+        )
+        XCTAssertEqual(response.scope, .parentingTopic)
+        XCTAssertTrue(response.context.contains("Communication"), "did not say what it does cover")
+    }
+
+    /// A parent cannot guess the app only covers milestones. An unrecognised
+    /// question has to teach that, not just ask for more words.
+    func testUnclearQuestionShowsExamples() {
+        let response = AssistantEngine.respond(
+            to: "hmm not sure really", milestones: catalogFixture(), correctedAge: 12
+        )
+        XCTAssertEqual(response.scope, .unclear)
+        XCTAssertTrue(response.context.contains("\""), "no example questions offered")
+        XCTAssertFalse(response.activities.isEmpty, "left the parent with nothing to do")
+    }
+
+    func testDevelopmentalQuestionsStayInScope() {
+        for question in ["is she walking yet", "he isn't saying many words"] {
+            XCTAssertEqual(
+                AssistantEngine.respond(to: question, milestones: catalogFixture(), correctedAge: 14).scope,
+                .developmental,
+                "wrongly rejected: \(question)"
+            )
+        }
+    }
+}
+
+// MARK: - Question kind
+
+final class QuestionKindTests: XCTestCase {
+
+    func testKindsAreRecognised() {
+        let cases: [(String, QuestionKind)] = [
+            ("When should she start walking?", .when),
+            ("At what age do they say first words?", .when),
+            ("What can I do to help her talk more?", .howToHelp),
+            ("Should I be worried she isn't walking?", .shouldIWorry),
+            ("Is it normal that she isn't walking?", .isThisNormal),
+            ("What comes next after crawling?", .whatsNext),
+            ("she points at everything", .general)
+        ]
+        for (question, expected) in cases {
+            XCTAssertEqual(QuestionParser.kind(of: question), expected, "failed for: \(question)")
+        }
+    }
+
+    /// A worried question that also says "is it normal" is a worry question.
+    func testWorryOutranksNormality() {
+        XCTAssertEqual(
+            QuestionParser.kind(of: "Is it normal she isn't walking, should I be worried?"),
+            .shouldIWorry
+        )
+    }
+
+    /// The old engine answered "when" with a paragraph about how ranges vary,
+    /// which is true and useless. A timing question must contain a time.
+    func testWhenQuestionsAnswerWithATime() {
+        let response = AssistantEngine.respond(
+            to: "When should she start walking?", milestones: catalogFixture(), correctedAge: 10
+        )
+        XCTAssertEqual(response.kind, .when)
+        XCTAssertTrue(
+            response.context.contains("months") || response.context.contains("year"),
+            "timing question gave no timing: \(response.context)"
+        )
+    }
+
+    /// "What comes after crawling" named crawling, so crawling ranked top and
+    /// came back as the answer.
+    func testWhatsNextNeverAnswersWithThePresent() {
+        // Its own fixture: the shared one jumps 12 to 30 months, so nothing sits
+        // in the window a forward-looking question actually reads.
+        var milestones = catalogFixture()
+        milestones.append(
+            Milestone(title: "Walks up steps with help", category: "Gross Motor", ageMonth: 18,
+                      tips: "One step at a time, two feet per step, is the usual order.")
+        )
+        let response = AssistantEngine.respond(
+            to: "What comes next after crawling?", milestones: milestones, correctedAge: 12
+        )
+        XCTAssertEqual(response.kind, .whatsNext)
+        XCTAssertFalse(response.cited.isEmpty)
+        XCTAssertTrue(
+            response.cited.allSatisfy { $0.ageMonth > 12 },
+            "cited something already reached: \(response.cited.map { "\($0.title) \($0.ageMonth)mo" })"
+        )
+    }
+
+    /// Three different kinds of question about the same topic used to return the
+    /// same three-part answer.
+    func testDifferentKindsOnOneTopicReadDifferently() {
+        let milestones = catalogFixture()
+        let when = AssistantEngine.respond(to: "When should she start walking?", milestones: milestones, correctedAge: 12)
+        let help = AssistantEngine.respond(to: "What can I do to help her walk?", milestones: milestones, correctedAge: 12)
+        let worry = AssistantEngine.respond(to: "Should I be worried she isn't walking?", milestones: milestones, correctedAge: 12)
+
+        XCTAssertEqual(when.domain, .grossMotor)
+        XCTAssertEqual(help.domain, .grossMotor)
+        XCTAssertEqual(worry.domain, .grossMotor)
+
+        XCTAssertNotEqual(when.context, help.context)
+        XCTAssertNotEqual(when.context, worry.context)
+        XCTAssertNotEqual(help.context, worry.context)
+    }
+}

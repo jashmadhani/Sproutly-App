@@ -21,6 +21,30 @@ enum QuestionConcern: Int, Comparable {
     }
 }
 
+// MARK: - Question Kind
+
+/// What the parent is asking *for*, as distinct from what they are asking
+/// *about*.
+///
+/// The engine scored a domain and then gave every question the same three-part
+/// answer: a framing sentence, a catalog tip, three activities. So "when should
+/// she put words together", "what can I do to help her talk", and "should I be
+/// worried she isn't talking" all came back in the same shape, and the first of
+/// those never answered with a time at all, even though the catalog knows it.
+enum QuestionKind: Equatable {
+    /// "when should…", "at what age…", "how old before…"
+    case when
+    /// "what can I do…", "how do I help…", "any tips…"
+    case howToHelp
+    /// "should I be worried…", "is this a problem…"
+    case shouldIWorry
+    /// "is it normal that…", "is it ok that…"
+    case isThisNormal
+    /// "what comes next…", "what should I expect…"
+    case whatsNext
+    case general
+}
+
 // MARK: - Parsed Question
 
 struct AssistantIntent {
@@ -30,9 +54,15 @@ struct AssistantIntent {
     let domainScores: [MilestoneCategory: Double]
     let topDomain: MilestoneCategory?
     let concern: QuestionConcern
+    let kind: QuestionKind
+    let scope: QuestionScope
+    /// The word that decided an out-of-scope answer, so the reply can name the
+    /// subject back rather than refusing in the abstract.
+    let scopeTerm: String?
 
     /// True when nothing in the question named a domain or a topic we recognise.
     var isUnfocused: Bool { topDomain == nil }
+    var isDevelopmental: Bool { scope == .developmental }
 }
 
 // MARK: - Question Parser
@@ -135,6 +165,49 @@ enum QuestionParser {
         "baby", "child", "kid", "son", "daughter", "toddler", "boy", "girl"
     ]
 
+    // MARK: Question kind
+
+    /// Matched on phrases rather than lemmas. These are grammatical shapes, not
+    /// vocabulary, and "what can I" is not recoverable from a bag of words.
+    static func kind(of question: String) -> QuestionKind {
+        let text = " " + question.lowercased()
+            .replacingOccurrences(of: "'", with: "'")
+            .replacingOccurrences(of: "\u{2019}", with: "'") + " "
+
+        func any(_ phrases: [String]) -> Bool {
+            phrases.contains { text.contains($0) }
+        }
+
+        // Order is deliberate. A worried question that opens "is it normal that
+        // she still isn't walking, should I be concerned" is a worry question,
+        // so worry is tested before normality.
+        if any(["should i worry", "should i be worried", "should i be concerned",
+                "am i right to worry", "is this a problem", "is that a problem",
+                "red flag", "something wrong", "is something wrong"]) {
+            return .shouldIWorry
+        }
+        if any(["what age", "at what age", "how old", "when should", "when will",
+                "when do ", "when does", "by when", "how soon", "what point"]) {
+            return .when
+        }
+        if any(["what can i", "what should i do", "how can i", "how do i",
+                "what do i do", "any tips", "how to help", "help her", "help him",
+                "help them", "encourage", "what activities", "things to try"]) {
+            return .howToHelp
+        }
+        if any(["what next", "what's next", "whats next", "what comes next",
+                "what comes after", "what should i expect", "what happens next",
+                "after this", "what follows"]) {
+            return .whatsNext
+        }
+        if any(["is it normal", "is this normal", "is that normal", "is it ok",
+                "is that ok", "is it okay", "is that okay", "normal for",
+                "common for", "usual for"]) {
+            return .isThisNormal
+        }
+        return .general
+    }
+
     // MARK: Tokenising
 
     /// A word plus its lemma. Both are kept: negation reads the surface form
@@ -170,7 +243,10 @@ enum QuestionParser {
     static func parse(_ question: String) -> AssistantIntent {
         let tokens = tokenize(question)
         guard !tokens.isEmpty else {
-            return AssistantIntent(lemmas: [], domainScores: [:], topDomain: nil, concern: .none)
+            return AssistantIntent(
+                lemmas: [], domainScores: [:], topDomain: nil, concern: .none,
+                kind: .general, scope: .unclear, scopeTerm: nil
+            )
         }
 
         var scores: [MilestoneCategory: Double] = [:]
@@ -202,11 +278,21 @@ enum QuestionParser {
             .map(\.lemma)
             .filter { !stopwords.contains($0) && $0.count > 1 }
 
+        let topDomain = resolveTopDomain(scores)
+
+        // Scope is decided before anything else is used. An urgent sign
+        // outranks a developmental match outright: a question mentioning both
+        // walking and blood in a nappy is not a walking question.
+        let scope = ScopeDetector.detect(tokens: tokens, hasDomain: topDomain != nil)
+
         return AssistantIntent(
             lemmas: lemmas,
-            domainScores: scores,
-            topDomain: resolveTopDomain(scores),
-            concern: concern
+            domainScores: scope.scope == .developmental ? scores : [:],
+            topDomain: scope.scope == .developmental ? topDomain : nil,
+            concern: concern,
+            kind: kind(of: question),
+            scope: scope.scope,
+            scopeTerm: scope.matchedTerm
         )
     }
 

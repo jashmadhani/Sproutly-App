@@ -22,12 +22,27 @@ enum AssistantEngine {
 
         let intent = QuestionParser.parse(question)
 
-        let retrieved = AssistantRetriever.retrieve(
+        // "What comes next" is the one question asked about an age the child
+        // has not reached, so the retrieval window moves with it.
+        let retrievalAge = intent.kind == .whatsNext ? correctedAge + 6 : correctedAge
+
+        var retrieved = AssistantRetriever.retrieve(
             intent: intent,
             milestones: milestones,
-            correctedAge: correctedAge,
+            correctedAge: retrievalAge,
             excludedBands: excludedBands
         )
+
+        // "What comes after crawling" named crawling, so crawling matched best
+        // and came back as the answer. A forward-looking question must not be
+        // answered with the thing it was asked about.
+        // Strict, with no fall back to the unfiltered list. If there is nothing
+        // ahead in this area, citing what the child has already reached as
+        // "next" is worse than citing nothing, and the composer handles an
+        // empty anchor.
+        if intent.kind == .whatsNext {
+            retrieved = retrieved.filter { $0.ageMonth > correctedAge }
+        }
 
         // Progress is read through `DevelopmentObserver` rather than recounted
         // here. The old engine kept its own ratio, and it disagreed with the
