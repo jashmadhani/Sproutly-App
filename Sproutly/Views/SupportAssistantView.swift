@@ -76,6 +76,39 @@ struct SupportAssistantView: View {
             .underlineField(nightMode: nightMode, isFocused: isInputFocused)
             .animation(.easeInOut(duration: 0.25), value: question.isEmpty)
 
+            // Before anything has been asked. A parent cannot guess that this
+            // covers milestones and not stool colour or sleep training, and the
+            // field invites anything. Showing what it answers well is the only
+            // honest way to say so before they have typed.
+            if response == nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Try asking")
+                        .font(Theme.sproutlyCardTitle)
+                        .foregroundStyle(Theme.accentBlueText(for: nightMode))
+
+                    ForEach(Self.starterQuestions, id: \.self) { starter in
+                        Button {
+                            question = starter
+                            generateResponse()
+                            isInputFocused = false
+                        } label: {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "arrow.up.right")
+                                    .font(Theme.sproutlyMeta)
+                                    .foregroundStyle(Theme.growthGreenText(for: nightMode))
+                                Text(starter)
+                                    .font(Theme.sproutlyBody)
+                                    .foregroundStyle(Theme.textSecondary(for: nightMode))
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Asks this question")
+                    }
+                }
+            }
+
             // Response area
             if let resp = response {
                 VStack(alignment: .leading, spacing: 12) {
@@ -142,9 +175,16 @@ struct SupportAssistantView: View {
 
                     // Pediatric note (when appropriate)
                     if let pediatric = resp.pediatricNote {
+                        // An urgent redirect is the most important thing on the
+                        // screen, so it is not rendered in the quieter secondary
+                        // weight the standing note uses.
                         Text(pediatric)
                             .font(Theme.sproutlyBody)
-                            .foregroundStyle(Theme.textSecondary(for: nightMode).opacity(0.9))
+                            .foregroundStyle(
+                                resp.scope == .urgentHealthSymptom
+                                    ? Theme.textPrimary(for: nightMode)
+                                    : Theme.textSecondary(for: nightMode).opacity(0.9)
+                            )
                             .padding(.top, 4)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -162,6 +202,17 @@ struct SupportAssistantView: View {
         }
         .warmCard(nightMode: nightMode)
     }
+
+    // MARK: - Starters
+
+    /// One per shape the engine answers well: a timing question, a what-can-I-do
+    /// question, and an is-this-ordinary question. They teach the range of what
+    /// can be asked, not just three facts.
+    private static let starterQuestions = [
+        "When do children start putting words together?",
+        "What can I do to help with her balance?",
+        "Is it normal that he plays alongside other children rather than with them?"
+    ]
 
     // MARK: - Response Generation
 
