@@ -18,6 +18,11 @@ struct SupportAssistantView: View {
     let nightMode: Bool
 
     @State private var question: String = ""
+    /// What produced the answer on screen. The field is cleared on send, so
+    /// without this the card would show a reply with nothing to say what it was
+    /// replying to — and a parent returning to this tab later would find an
+    /// answer and no question.
+    @State private var askedQuestion: String = ""
     @State private var response: AssistantResponse? = nil
     @State private var responseOpacity: Double = 0
     @FocusState private var isInputFocused: Bool
@@ -112,6 +117,14 @@ struct SupportAssistantView: View {
             // Response area
             if let resp = response {
                 VStack(alignment: .leading, spacing: 12) {
+                    if !askedQuestion.isEmpty {
+                        Text(askedQuestion)
+                            .font(Theme.sproutlyMeta)
+                            .foregroundStyle(Theme.textSecondary(for: nightMode))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel("You asked: \(askedQuestion)")
+                    }
+
                     // What is ordinarily true at this age
                     Text(resp.context)
                         .font(Theme.sproutlyBody)
@@ -221,6 +234,12 @@ struct SupportAssistantView: View {
         guard !asked.isEmpty else { return }
 
         responseOpacity = 0
+        askedQuestion = asked
+        // Cleared on send, the way a message box is. Leaving the sent text in
+        // place made the field look like an unfinished draft and made the send
+        // button re-run the same question.
+        question = ""
+
         response = AssistantEngine.respond(
             to: asked,
             milestones: milestones,
