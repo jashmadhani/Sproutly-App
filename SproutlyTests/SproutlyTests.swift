@@ -2157,7 +2157,31 @@ final class UIRegressionTests: XCTestCase {
         )
 
         // And the row adapts rather than overflowing at large text sizes.
-        XCTAssertTrue(text.contains("dynamicTypeSize.isAccessibilitySize"))
+        //
+        // This used to assert `dynamicTypeSize.isAccessibilitySize`, which was
+        // the wrong trigger. Measured on a 402pt screen, the backfill card
+        // margin was 20.0pt at large, 15.5pt at xLarge and 7.3pt at xxLarge —
+        // all of them below the first accessibility size. The row widened the
+        // whole VStack, the ZStack centred it, and every onboarding screen
+        // drifted outward symmetrically. ViewThatFits asks the row whether it
+        // fits instead of asking the text size.
+        XCTAssertTrue(
+            text.contains("ViewThatFits(in: .horizontal)"),
+            "the backfill button row no longer adapts; it overflowed from xLarge upward"
+        )
+
+        // A zero-length Spacer is infinitely compressible, so the horizontal
+        // candidate would always claim to fit and ViewThatFits would never fall
+        // through to the stacked one. Scoped to this row: other views in the
+        // file use a zero Spacer legitimately.
+        guard let rowRange = text.range(of: "var backfillButtons: some View") else {
+            return XCTFail("backfillButtons is gone")
+        }
+        let rowBody = String(text[rowRange.lowerBound...].prefix(900))
+        XCTAssertFalse(
+            rowBody.contains("Spacer(minLength: 0)"),
+            "the row's Spacer must keep a real minimum or ViewThatFits cannot reject it"
+        )
     }
 
     // "See how much has changed since last month." truncated to "…last mo…"
