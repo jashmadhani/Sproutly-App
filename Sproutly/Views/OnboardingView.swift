@@ -33,7 +33,6 @@ struct OnboardingView: View {
     @State private var backfillSelection: Set<String> = []
 
     @FocusState private var isNameFieldFocused: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private static let profileStepIndex = 4
 
@@ -548,20 +547,30 @@ private extension OnboardingView {
     // a 44pt target rather than a third capsule, and at accessibility text
     // sizes the two exits stack full-width instead of competing for a line.
     var backfillButtons: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 12) {
-                    doneButton.frame(maxWidth: .infinity)
-                    skipButton.frame(maxWidth: .infinity)
-                    backChevron
-                }
-            } else {
-                HStack(spacing: 12) {
-                    backChevron
-                    skipButton
-                    Spacer(minLength: 0)
-                    doneButton
-                }
+        // Measured, not guessed at. `isAccessibilitySize` was the wrong trigger:
+        // the row already overflows at xLarge, three steps below the first
+        // accessibility size, and xLarge is an ordinary setting. On a 402pt
+        // screen the card margin measured 20.0pt at large, 15.5pt at xLarge and
+        // 7.3pt at xxLarge — the row was widening the whole VStack, which the
+        // ZStack then centred, so every screen in onboarding drifted outward
+        // symmetrically and looked like a device difference.
+        //
+        // ViewThatFits asks the row itself instead of asking the text size.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                backChevron
+                skipButton
+                // A real minimum, so the horizontal candidate is rejected when
+                // the two pills would actually touch. A zero-length Spacer is
+                // infinitely compressible and would always claim to fit.
+                Spacer(minLength: 12)
+                doneButton
+            }
+
+            VStack(spacing: 12) {
+                doneButton.frame(maxWidth: .infinity)
+                skipButton.frame(maxWidth: .infinity)
+                backChevron
             }
         }
     }
