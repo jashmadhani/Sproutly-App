@@ -792,14 +792,7 @@ extension View {
     /// the screen. Extracted rather than copied a third and fourth time so the
     /// four tabs cannot drift apart again.
     func scrollEdgeFade() -> some View {
-        mask(
-            VStack(spacing: 0) {
-                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 80)
-                Color.black
-            }
-            .ignoresSafeArea()
-        )
+        modifier(ScrollEdgeFade())
     }
 
     func warmCard(nightMode: Bool) -> some View {
@@ -1328,5 +1321,38 @@ struct AmbientBackground: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+// MARK: - Scroll Edge Fade
+
+/// Masks scrolling content out beneath the status bar.
+///
+/// The gradient used to run 80pt from the top of the *screen*, which left
+/// content sitting at 40-60pt at 50-75% opacity: exactly where the clock and
+/// the Dynamic Island are, so text stayed legible behind them. It is now fully
+/// clear through the safe area and fades in over 32pt below it, so nothing is
+/// ever partly visible behind the status bar.
+///
+/// The inset is read rather than hardcoded because it is not one number: a
+/// Dynamic Island device reports about 59pt, an older notch about 47pt, and a
+/// button device 20pt.
+private struct ScrollEdgeFade: ViewModifier {
+    func body(content: Content) -> some View {
+        content.mask(
+            // This GeometryReader deliberately does NOT ignore the safe area.
+            // Its whole job is to report the inset; only the mask it builds
+            // extends past it.
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: proxy.safeAreaInsets.top)
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 32)
+                    Color.black
+                }
+                .ignoresSafeArea()
+            }
+        )
     }
 }
