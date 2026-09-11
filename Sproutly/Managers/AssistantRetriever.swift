@@ -126,6 +126,56 @@ enum AssistantRetriever {
         return ordered.prefix(limit).map { MilestoneReference($0.milestone) }
     }
 
+    /// The earliest milestone whose **title** the question names, ignoring the
+    /// child's age entirely.
+    ///
+    /// Ordinary retrieval is gated to the child's age band, which is right for
+    /// answering but wrong for two other jobs:
+    ///
+    /// - A timing question is about an age the child has not reached. Gated
+    ///   retrieval cannot see it, so "when should she start walking" asked about
+    ///   a four-month-old answered out of the nine month band.
+    /// - A question can contradict the stored age. "He's not walking straight"
+    ///   asked about a four-month-old produced tummy time suggestions, because
+    ///   the engine trusted the date of birth over what the parent had just said.
+    ///
+    /// Earliest rather than best-scoring on ties, so a concept is dated from the
+    /// first band it appears in. That makes the contradiction test conservative:
+    /// it only fires when the child is below even the earliest occurrence.
+    static func earliestNamedMilestone(
+        intent: AssistantIntent,
+        milestones: [Milestone],
+        excludedBands: Set<Int> = []
+    ) -> MilestoneReference? {
+        guard !intent.lemmas.isEmpty, let domain = intent.topDomain else { return nil }
+
+        let scored: [(milestone: Milestone, hits: Int)] = milestones.compactMap { milestone in
+            guard !milestone.isUserCreated,
+                  !excludedBands.contains(milestone.ageMonth),
+                  milestone.categoryType == domain
+            else { return nil }
+
+            // Titles only. A tip is written prose whose everyday words match
+            // almost any question, and a loose match here would misdate the
+            // concept and fire a false contradiction.
+            let titleLemmas = lemmas(for: milestone.title)
+            let hits = intent.lemmas.reduce(into: 0) { total, lemma in
+                if titleLemmas.contains(lemma) { total += 1 }
+            }
+            return hits > 0 ? (milestone, hits) : nil
+        }
+
+        let best = scored.sorted { lhs, rhs in
+            if lhs.hits != rhs.hits { return lhs.hits > rhs.hits }
+            if lhs.milestone.ageMonth != rhs.milestone.ageMonth {
+                return lhs.milestone.ageMonth < rhs.milestone.ageMonth
+            }
+            return lhs.milestone.title < rhs.milestone.title
+        }.first
+
+        return best.map { MilestoneReference($0.milestone) }
+    }
+
     // MARK: Scoring
 
     /// True when the question and the milestone share a subject, rather than

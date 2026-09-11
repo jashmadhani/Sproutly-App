@@ -43,6 +43,21 @@ enum QuestionKind: Equatable {
     /// "what comes next…", "what should I expect…"
     case whatsNext
     case general
+
+    /// True when the question is about what the child is doing now rather than
+    /// what is coming.
+    ///
+    /// A timing question about a four-month-old ("when should she start
+    /// walking") is ordinary and forward-looking. A statement that a
+    /// four-month-old walks is a contradiction worth surfacing. `howToHelp` is
+    /// deliberately on the forward side: "what can I do to help him walk" asked
+    /// early is answered well by the precursors to walking.
+    var assertsPresentCapability: Bool {
+        switch self {
+        case .when, .whatsNext, .howToHelp: return false
+        case .general, .shouldIWorry, .isThisNormal: return true
+        }
+    }
 }
 
 // MARK: - Parsed Question
