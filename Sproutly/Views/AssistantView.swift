@@ -54,14 +54,7 @@ struct AssistantView: View {
             .coordinateSpace(name: "assistantScroll")
             .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
             .scrollDismissesKeyboard(.interactively)
-            .mask(
-                VStack(spacing: 0) {
-                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 80)
-                    Color.black
-                }
-                .ignoresSafeArea()
-            )
+            .scrollEdgeFade()
 
             // Compact sticky header
             VStack {
