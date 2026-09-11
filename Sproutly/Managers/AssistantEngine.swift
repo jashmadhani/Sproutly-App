@@ -34,12 +34,10 @@ enum AssistantEngine {
         )
 
         // "What comes after crawling" named crawling, so crawling matched best
-        // and came back as the answer. A forward-looking question must not be
-        // answered with the thing it was asked about.
-        // Strict, with no fall back to the unfiltered list. If there is nothing
-        // ahead in this area, citing what the child has already reached as
-        // "next" is worse than citing nothing, and the composer handles an
-        // empty anchor.
+        // and came back as the answer. Strict, with no fall back to the
+        // unfiltered list: if there is nothing ahead in this area, citing what
+        // the child has already reached as "next" is worse than citing nothing,
+        // and the composer handles an empty anchor.
         if intent.kind == .whatsNext {
             retrieved = retrieved.filter { $0.ageMonth > correctedAge }
         }
@@ -60,11 +58,29 @@ enum AssistantEngine {
             ).first { $0.category == domain }
         }
 
+        // Age-independent, so a timing question can reach past the child's band
+        // and a question that contradicts the stored age can be recognised as
+        // one. Computed once and handed over rather than looked up twice.
+        let named = AssistantRetriever.earliestNamedMilestone(
+            intent: intent,
+            milestones: milestones,
+            excludedBands: excludedBands
+        )
+
+        // A timing answer names an age the child has not reached, so the
+        // age-gated citations belong to a different question. Asked when walking
+        // starts about a four-month-old, the reply said twelve months and then
+        // listed tummy time milestones underneath it.
+        if intent.kind == .when, let named {
+            retrieved = [named]
+        }
+
         return AssistantComposer.compose(
             intent: intent,
             retrieved: retrieved,
             observation: observation,
-            correctedAge: correctedAge
+            correctedAge: correctedAge,
+            namedMilestone: named
         )
     }
 }

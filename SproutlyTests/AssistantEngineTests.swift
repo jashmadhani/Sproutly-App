@@ -531,3 +531,134 @@ final class QuestionKindTests: XCTestCase {
         XCTAssertNotEqual(help.context, worry.context)
     }
 }
+
+// MARK: - Age contradiction
+
+/// The question and the stored date of birth can disagree. The engine trusted
+/// the date of birth and answered from the age band, which is how a child
+/// described as walking was offered tummy time.
+final class AgeContradictionTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        AssistantRetriever.resetCache()
+    }
+
+    /// The exact case from the screenshot: a four-month-old profile, a question
+    /// describing a child who walks.
+    func testWalkingQuestionAboutAFourMonthOldIsNotAnsweredWithTummyTime() {
+        let response = AssistantEngine.respond(
+            to: "He's not walking straight and walks in a zig zag manner",
+            milestones: DataSeeder.allMilestones,
+            correctedAge: 4
+        )
+
+        let everything = ([response.context, response.pediatricNote ?? ""] + response.activities)
+            .joined(separator: " ")
+            .lowercased()
+        XCTAssertFalse(everything.contains("tummy time"), "offered tummy time to a walking child")
+        XCTAssertFalse(everything.contains("cushion"), "offered floor work to a walking child")
+
+        XCTAssertTrue(response.activities.isEmpty, "a contradicted age must not drive activity ideas")
+        XCTAssertFalse(
+            response.cited.contains { $0.ageMonth <= 4 },
+            "cited the contradicted band: \(response.cited.map(\.title))"
+        )
+    }
+
+    /// It says which two things disagree, and offers the likeliest cause.
+    func testContradictionNamesBothAgesAndOffersTheFix() {
+        let response = AssistantEngine.respond(
+            to: "He's not walking straight and walks in a zig zag manner",
+            milestones: DataSeeder.allMilestones,
+            correctedAge: 4
+        )
+        XCTAssertTrue(response.context.contains("12 months"), response.context)
+        XCTAssertTrue(response.context.contains("4 months"), response.context)
+        XCTAssertTrue(response.pediatricNote?.contains("Settings") == true)
+        XCTAssertEqual(response.cited.first?.ageMonth, 12)
+    }
+
+    /// A concept appearing in several bands is dated from the earliest, so the
+    /// test only fires when the child is below even the first occurrence.
+    /// "walk" sits at 12, 15, 18 and 30 months in the catalog.
+    func testAConceptIsDatedFromItsEarliestBand() {
+        let intent = QuestionParser.parse("he walks everywhere now")
+        let named = AssistantRetriever.earliestNamedMilestone(
+            intent: intent, milestones: DataSeeder.allMilestones
+        )
+        XCTAssertEqual(named?.ageMonth, 12)
+    }
+
+    /// A timing question is about an age the child has not reached. It is
+    /// ordinary, never a contradiction, and must answer with the real age.
+    func testTimingQuestionAboutAFutureSkillIsNotAContradiction() {
+        let response = AssistantEngine.respond(
+            to: "When should he start walking?",
+            milestones: DataSeeder.allMilestones,
+            correctedAge: 4
+        )
+        XCTAssertEqual(response.kind, .when)
+        XCTAssertFalse(response.pediatricNote?.contains("Settings") ?? false)
+        XCTAssertTrue(
+            response.context.contains("12 months"),
+            "gated retrieval answered a timing question out of the wrong band: \(response.context)"
+        )
+    }
+
+    /// Asked early, this is answered well by the precursors, so it stays on the
+    /// forward-looking side and is never flagged.
+    func testHowToHelpIsNotFlagged() {
+        let response = AssistantEngine.respond(
+            to: "What can I do to help him walk?",
+            milestones: DataSeeder.allMilestones,
+            correctedAge: 4
+        )
+        XCTAssertEqual(response.kind, .howToHelp)
+        XCTAssertFalse(response.activities.isEmpty)
+        XCTAssertFalse(response.pediatricNote?.contains("Settings") ?? false)
+    }
+
+    /// Precision matters more than recall here: a wrong "your child's age may be
+    /// wrong" is insulting. An in-band question must never trigger it.
+    func testInBandQuestionsAreNeverFlagged() {
+        let cases: [(String, Int)] = [
+            ("He isn't rolling over yet", 6),          // rolling sits at 6 months
+            ("Is she walking yet?", 12),               // walking sits at 12
+            ("he isn't saying many words", 18),
+            ("she still isn't walking", 14)            // four months late, not a contradiction
+        ]
+        for (question, age) in cases {
+            let response = AssistantEngine.respond(
+                to: question, milestones: DataSeeder.allMilestones, correctedAge: age
+            )
+            XCTAssertFalse(
+                response.pediatricNote?.contains("Settings") ?? false,
+                "falsely flagged: \(question) at \(age) months"
+            )
+        }
+    }
+
+    func testAgeTextReadsNaturallyBelowTwoMonths() {
+        XCTAssertEqual(AssistantComposer.ageText(0), "under a month")
+        XCTAssertEqual(AssistantComposer.ageText(1), "1 month")
+        XCTAssertEqual(AssistantComposer.ageText(2), "2 months")
+        XCTAssertEqual(AssistantComposer.ageText(12), "12 months")
+        XCTAssertEqual(AssistantComposer.ageText(24), "2 years")
+        XCTAssertEqual(AssistantComposer.ageText(30), "2 and a half")
+    }
+
+    /// A contradiction reply is still deterministic.
+    func testContradictionIsStable() {
+        let question = "He's not walking straight and walks in a zig zag manner"
+        let first = AssistantEngine.respond(
+            to: question, milestones: DataSeeder.allMilestones, correctedAge: 4
+        )
+        for _ in 0..<10 {
+            XCTAssertEqual(
+                AssistantEngine.respond(to: question, milestones: DataSeeder.allMilestones, correctedAge: 4),
+                first
+            )
+        }
+    }
+}

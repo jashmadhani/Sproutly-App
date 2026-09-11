@@ -42,11 +42,17 @@ struct AssistantResponse: Equatable {
 /// either catalog content or something the parent themselves saved.
 enum AssistantComposer {
 
+    /// Months a named capability must sit ahead of the child before the answer
+    /// stops and says so. The retrieval window already allows six months ahead,
+    /// so anything reaching this is outside what would ever be answered anyway.
+    static let contradictionThresholdMonths = 6
+
     static func compose(
         intent: AssistantIntent,
         retrieved: [MilestoneReference],
         observation: DomainObservation?,
-        correctedAge: Int
+        correctedAge: Int,
+        namedMilestone: MilestoneReference? = nil
     ) -> AssistantResponse {
 
         // A question outside milestones is answered as one, not scored against
@@ -55,12 +61,22 @@ enum AssistantComposer {
             return outOfScope(intent: intent, correctedAge: correctedAge)
         }
 
+        // The question says the child does something the stored age puts well
+        // ahead of them. Answering from the age band produced tummy time
+        // suggestions for a child the parent had just described as walking.
+        if intent.kind.assertsPresentCapability,
+           let named = namedMilestone,
+           named.ageMonth - correctedAge >= contradictionThresholdMonths {
+            return ageContradiction(intent: intent, named: named, correctedAge: correctedAge)
+        }
+
         let seed = deterministicSeed(for: intent)
 
         let context = composeContext(
             intent: intent,
             retrieved: retrieved,
             correctedAge: correctedAge,
+            namedMilestone: namedMilestone,
             seed: seed
         )
 
@@ -82,6 +98,41 @@ enum AssistantComposer {
             activities: activities,
             pediatricNote: note,
             cited: retrieved,
+            domain: intent.topDomain,
+            scope: intent.scope,
+            kind: intent.kind
+        )
+    }
+
+    // MARK: Age contradiction
+
+    /// Says plainly that the question and the stored age disagree, and offers
+    /// the likeliest cause.
+    ///
+    /// One wording covers both readings deliberately. "He's not walking
+    /// straight" and "should I be worried he isn't talking in sentences" reach
+    /// here identically, but the first describes a child who does the thing and
+    /// the second a parent worried it is missing. Negation scoping cannot tell
+    /// them apart — in the first the "not" attaches to *straight*, not to
+    /// walking — so guessing would be wrong half the time. Stating both ages and
+    /// letting the parent see which applies is right in both cases; an earlier
+    /// draft said "or they are ahead of the usual range", which read as nonsense
+    /// to the parent who had just said their child was not doing it.
+    ///
+    /// No activities and no age-band citations: if the date of birth is wrong,
+    /// everything derived from it is wrong too, and repeating it is the bug this
+    /// exists to stop. The named milestone is cited so the parent can see what
+    /// was matched and at what age.
+    private static func ageContradiction(
+        intent: AssistantIntent,
+        named: MilestoneReference,
+        correctedAge: Int
+    ) -> AssistantResponse {
+        AssistantResponse(
+            context: "Sproutly has your child at \(ageText(correctedAge)), and what you are describing usually comes closer to \(ageText(named.ageMonth)).",
+            activities: [],
+            pediatricNote: "If the date of birth needs correcting, you can change it in Settings. If it is right, there is nothing behind here: this is simply a long way off yet.",
+            cited: [named],
             domain: intent.topDomain,
             scope: intent.scope,
             kind: intent.kind
@@ -175,6 +226,7 @@ enum AssistantComposer {
         intent: AssistantIntent,
         retrieved: [MilestoneReference],
         correctedAge: Int,
+        namedMilestone: MilestoneReference?,
         seed: Int
     ) -> String {
 
@@ -201,7 +253,13 @@ enum AssistantComposer {
         case .when:
             // The old engine never answered this. A parent asking when got a
             // paragraph about how ranges vary, which is true and useless.
-            if let anchor {
+            //
+            // Read from the age-independent match first: a timing question is
+            // about an age the child has not reached, and gated retrieval
+            // cannot see past the band they are in. Asked about a
+            // four-month-old, "when should she start walking" was answered out
+            // of the nine month band.
+            if let anchor = namedMilestone ?? anchor {
                 sentences.append("\(anchor.title) usually shows up around \(ageText(anchor.ageMonth)).")
                 sentences.append("Ranges are wide here, so a few months either side of that is ordinary rather than late.")
             } else if let framing {
@@ -246,12 +304,19 @@ enum AssistantComposer {
     }
 
     /// Prose form, not the compact `expectedAgeText` the milestone rows use.
+    ///
+    /// Catalog bands start at two months, but a child's corrected age can be 0
+    /// or 1, which read as "0 months" and "1 months".
     static func ageText(_ months: Int) -> String {
-        if months < 24 { return "\(months) months" }
-        let years = months / 12
-        let remainder = months % 12
-        if remainder == 0 { return years == 1 ? "a year" : "\(years) years" }
-        return "\(years) and a half"
+        switch months {
+        case ..<1:   return "under a month"
+        case 1:      return "1 month"
+        case 2..<24: return "\(months) months"
+        default:
+            let years = months / 12
+            let remainder = months % 12
+            return remainder == 0 ? "\(years) years" : "\(years) and a half"
+        }
     }
 
     private static func lowercasedFirst(_ text: String) -> String {
