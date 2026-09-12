@@ -23,9 +23,21 @@ struct SproutlySegmentedControl<Option: Hashable>: View {
     let title: (Option) -> String
 
     @Environment(ThemeManager.self) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: 4) {
+        // At accessibility text sizes three segments cannot share a line: a render
+        // at the largest size split "Weight" into "Weig" / "ht". The segments
+        // stack instead, the same reflow FormRow and FeatureCardHeader use. The
+        // stadium radius comes down with it, since a 999pt radius on a tall stack
+        // would round its corners into the labels.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 4))
+        let pillRadius: CGFloat = stacked ? 18 : 999
+
+        layout {
             ForEach(options, id: \.self) { option in
                 let isSelected = selection == option
                 Button {
@@ -37,7 +49,7 @@ struct SproutlySegmentedControl<Option: Hashable>: View {
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 36)
                         .background(
-                            RoundedRectangle(cornerRadius: 999, style: .continuous)
+                            RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
                                 .fill(isSelected ? theme.card : Color.clear)
                                 .shadow(
                                     color: isSelected ? theme.cardShadow : .clear,
@@ -52,7 +64,7 @@ struct SproutlySegmentedControl<Option: Hashable>: View {
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 999, style: .continuous)
+            RoundedRectangle(cornerRadius: stacked ? pillRadius + 4 : 999, style: .continuous)
                 .fill(theme.recessedFill)
         )
         .accessibilityElement(children: .contain)

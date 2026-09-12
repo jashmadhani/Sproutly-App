@@ -22,12 +22,41 @@ struct GrowthChartView: View {
     let isCorrectedAge: Bool
 
     @Environment(ThemeManager.self) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Grows with Dynamic Type, because the axis labels do. A fixed height left
-    /// the plot area squeezed to a sliver at accessibility sizes.
+    /// the plot area squeezed to a sliver at accessibility sizes. Capped, or at
+    /// the largest size the plot outgrew the screen and the header scrolled away
+    /// from the line it describes.
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 220
 
+    /// Fewer ticks at accessibility sizes, where five month labels at that size
+    /// run into each other across a phone's width.
+    private var tickCount: Int { dynamicTypeSize.isAccessibilitySize ? 3 : 5 }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            chart
+
+            // What the axes are, as ordinary text. It used to be the chart's own
+            // axis titles, and those do not wrap: at the largest text size "Age in
+            // months" was cut off at the card edge, and for a premature child the
+            // longer "adjusted for arriving early" version would not fit at all.
+            Text(caption)
+                .font(Theme.sproutlyMeta)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var caption: String {
+        let what = "\(metric.title(ageMonths: Int(points.last?.ageMonths ?? 0))) in \(system.unitSymbol(for: metric))"
+        return isCorrectedAge
+            ? "\(what), by age in months adjusted for arriving early."
+            : "\(what), by age in months."
+    }
+
+    private var chart: some View {
         Chart(points) { point in
             let shown = system.fromMetric(point.value, metric: metric)
 
@@ -53,7 +82,10 @@ struct GrowthChartView: View {
         .chartYScale(domain: .automatic(includesZero: false))
         .chartXScale(domain: xDomain)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 5)) { value in
+            // `.aligned` pulls the first and last labels inside the plot. Centred
+            // labels on the edge ticks overflowed the chart's frame and were cut,
+            // so a render showed "1" where the axis meant 10 months.
+            AxisMarks(preset: .aligned, values: .automatic(desiredCount: tickCount)) { value in
                 AxisGridLine().foregroundStyle(theme.divider)
                 AxisValueLabel {
                     if let months = value.as(Double.self) {
@@ -64,7 +96,7 @@ struct GrowthChartView: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+            AxisMarks(preset: .aligned, position: .leading, values: .automatic(desiredCount: min(4, tickCount))) { value in
                 AxisGridLine().foregroundStyle(theme.divider)
                 AxisValueLabel {
                     if let number = value.as(Double.self) {
@@ -74,17 +106,7 @@ struct GrowthChartView: View {
                 }
             }
         }
-        .chartXAxisLabel(position: .bottom, alignment: .center) {
-            Text(isCorrectedAge ? "Age in months, adjusted for arriving early" : "Age in months")
-                .font(Theme.sproutlyMeta)
-                .foregroundStyle(theme.textSecondary)
-        }
-        .chartYAxisLabel(position: .leading) {
-            Text(system.unitSymbol(for: metric))
-                .font(Theme.sproutlyMeta)
-                .foregroundStyle(theme.textSecondary)
-        }
-        .frame(height: height)
+        .frame(height: min(height, 380))
         .accessibilityLabel("\(metric.title(ageMonths: Int(points.last?.ageMonths ?? 0))) over time")
     }
 

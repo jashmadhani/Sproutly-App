@@ -339,6 +339,54 @@ final class GrowthReportTests: XCTestCase {
     }
 }
 
+// MARK: - Layout regressions found on a render
+
+// Each of these was seen on a simulator screenshot, not reasoned about, and each
+// compiled and passed every other test while it was broken.
+final class GrowthLayoutRegressionTests: XCTestCase {
+
+    private func source(_ path: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func codeLines(_ text: String) -> [String] {
+        text.components(separatedBy: .newlines)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+    }
+
+    // Swift Charts axis titles do not wrap. At the largest text size "Age in
+    // months" was cut off at the card edge, and a premature child's longer title
+    // would not have fitted at any size. The caption under the chart wraps.
+    func testNoChartUsesAxisTitlesThatCannotWrap() throws {
+        let chart = codeLines(try source("Sproutly/Components/GrowthChartView.swift")).joined()
+        XCTAssertFalse(chart.contains(".chartXAxisLabel"))
+        XCTAssertFalse(chart.contains(".chartYAxisLabel"))
+    }
+
+    // A centred label on the last tick overflowed the chart frame: a render
+    // showed "1" where the axis meant 10 months.
+    func testChartAxisLabelsAreAlignedInsideThePlot() throws {
+        let chart = codeLines(try source("Sproutly/Components/GrowthChartView.swift"))
+        let axisMarks = chart.filter { $0.contains("AxisMarks(") }
+        XCTAssertFalse(axisMarks.isEmpty)
+        for line in axisMarks {
+            XCTAssertTrue(line.contains("preset: .aligned"), line)
+        }
+    }
+
+    // Three segments on one line split "Weight" into "Weig" / "ht" at the
+    // largest text size. The shared control must reflow, which also covers the
+    // Milestones filter that uses it.
+    func testSegmentedControlReflowsAtAccessibilitySizes() throws {
+        let control = codeLines(try source("Sproutly/Components/SproutlySegmentedControl.swift")).joined()
+        XCTAssertTrue(control.contains("isAccessibilitySize"))
+        XCTAssertTrue(control.contains("VStackLayout"))
+    }
+}
+
 // MARK: - Helpers
 
 private extension Result where Failure == GrowthEntryIssue {
