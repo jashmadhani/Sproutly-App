@@ -33,11 +33,39 @@ struct MilestoneReport {
     // Milestones a clinician would most want to see: well past the expected age
     // and still not met. Sproutly does not interpret these — it just surfaces them.
     let notYetMet: [Milestone]
+
+    // MARK: Growth
+
+    /// One measuring session as a report row. Values stay metric here and are
+    /// converted by the document, the same way the app screens do it.
+    struct GrowthRow: Identifiable, Equatable {
+        let id: UUID
+        let date: Date
+        /// Corrected, matching the "ages shown are corrected" line in the header.
+        let ageText: String
+        let weightKg: Double?
+        let lengthCm: Double?
+        let headCm: Double?
+    }
+
+    /// The most recent sessions, oldest first so change reads down the page.
+    let growth: [GrowthRow]
+    /// The parent's units, fixed when the report is built.
+    let growthUnits: GrowthUnitSystem
 }
 
 enum ReportBuilder {
 
-    static func build(for child: Child, on date: Date = Date()) -> MilestoneReport {
+    /// A report is for one visit, not a child's whole history. A dozen sessions
+    /// covers well over a year of checkups and keeps growth to part of a page a
+    /// clinician will actually read.
+    static let growthRowLimit = 12
+
+    static func build(
+        for child: Child,
+        on date: Date = Date(),
+        units: GrowthUnitSystem = .current()
+    ) -> MilestoneReport {
         let correctedAge = max(0, child.calculateCorrectedAge())
         let all = child.sortedMilestones
         let excludedBands = CatalogBaseline.excludedBands(for: child.id)
@@ -75,7 +103,34 @@ enum ReportBuilder {
                     $0.isSignificantlyLate(childAgeMonths: correctedAge)
                         && !excludedBands.contains($0.ageMonth)
                 }
-                .sorted { $0.ageMonth < $1.ageMonth }
+                .sorted { $0.ageMonth < $1.ageMonth },
+            growth: child.sortedGrowthMeasurements
+                .suffix(growthRowLimit)
+                .map { measurement in
+                    MilestoneReport.GrowthRow(
+                        id: measurement.id,
+                        date: measurement.date,
+                        ageText: ageText(months: Child.correctedAgeMonths(
+                            birthDate: child.birthDate,
+                            isPremature: child.isPremature,
+                            gestationalWeeks: child.gestationalWeeks,
+                            now: measurement.date
+                        )),
+                        weightKg: measurement.weightKg,
+                        lengthCm: measurement.lengthCm,
+                        headCm: measurement.headCm
+                    )
+                },
+            growthUnits: units
         )
+    }
+
+    /// "9 mo" under two, "2 y 3 mo" after. Compact because it sits in a table
+    /// column beside a date, where "2 years and 3 months" would wrap.
+    static func ageText(months: Int) -> String {
+        guard months >= 24 else { return "\(months) mo" }
+        let years = months / 12
+        let remainder = months % 12
+        return remainder == 0 ? "\(years) y" : "\(years) y \(remainder) mo"
     }
 }
