@@ -14,6 +14,46 @@ enum ShareRenderer {
     // US Letter at 72dpi, the coordinate space ImageRenderer works in.
     private static let pageSize = CGSize(width: 612, height: 792)
 
+    // MARK: - Where rendered files live
+
+    // Everything rendered here is written into one directory under tmp rather than
+    // loose in tmp itself, so the whole lot can be removed in a single call.
+    //
+    // This matters more than it looks: the PDF carries the child's name and their
+    // not-yet-met list, and the card carries their photo. Both used to be written
+    // straight into tmp under a predictable name and left there indefinitely, which
+    // sits badly with an app whose entire promise is that nothing about a child
+    // leaves the device. iOS reclaims tmp eventually, but on its own schedule.
+    //
+    // Filenames still read as the parent's own ("Aarav-milestones.pdf"), because
+    // that is what the share sheet shows them and what lands in a pediatrician's
+    // inbox. Only the containing folder changed.
+    private static var directory: URL? {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SharedRenders", isDirectory: true)
+
+        if !FileManager.default.fileExists(atPath: folder.path) {
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                sproutlyLog("could not create share directory — \(error.localizedDescription)")
+                return nil
+            }
+        }
+
+        return folder
+    }
+
+    /// Removes every rendered file.
+    ///
+    /// Called at launch to catch anything a crash or a force-quit stranded midway
+    /// through sharing. `ShareSheet` also deletes its own file as soon as the sheet
+    /// is finished with it, so in the ordinary case this finds nothing to do.
+    static func clearRenderedFiles() {
+        guard let directory else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     // MARK: - PDF
 
     // Renders the report to a paginated PDF in the temporary directory and returns
@@ -22,8 +62,8 @@ enum ShareRenderer {
         let renderer = ImageRenderer(content: ReportDocumentView(report: report))
         renderer.proposedSize = ProposedViewSize(width: pageSize.width, height: nil)
 
-        let filename = "\(safeName(report.childName))-milestones.pdf"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        guard let directory else { return nil }
+        let url = directory.appendingPathComponent("\(safeName(report.childName))-milestones.pdf")
 
         var success = false
 
@@ -79,10 +119,10 @@ enum ShareRenderer {
         renderer.scale = 3   // retina-quality when viewed full screen
 
         guard let image = renderer.uiImage,
-              let data = image.pngData() else { return nil }
+              let data = image.pngData(),
+              let directory else { return nil }
 
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(safeName(childName))-moment.png")
+        let url = directory.appendingPathComponent("\(safeName(childName))-moment.png")
 
         do {
             try data.write(to: url, options: .atomic)

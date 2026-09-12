@@ -20,6 +20,15 @@ final class PurchaseManager {
 
     static let productID = "com.sproutly.app.pro"
 
+    // MARK: - Copy
+
+    // Written once and reused, because the same two situations are reachable from
+    // both loading and purchasing and a parent should not get two different
+    // sentences for the same condition.
+    private static let unavailable = "Sproutly Pro isn't available right now. Please try again later."
+    private static let noConnection = "Couldn't reach the App Store. Check your connection and try again."
+    private static let somethingWentWrong = "Something went wrong at the App Store's end. Please try again in a moment."
+
     enum PurchaseState: Equatable {
         case idle
         case purchasing
@@ -65,11 +74,11 @@ final class PurchaseManager {
                 // error when the product ID isn't recognized. Silently leaving
                 // this unset is what made the paywall spin forever with no
                 // explanation; surface it so the button can show a real state.
-                state = .failed("Sproutly Pro isn't available right now. Please try again later.")
+                state = .failed(Self.unavailable)
             }
         } catch {
             sproutlyLog("could not load product — \(error.localizedDescription)")
-            state = .failed("Couldn't reach the App Store. Check your connection and try again.")
+            state = .failed(Self.noConnection)
         }
     }
 
@@ -112,7 +121,7 @@ final class PurchaseManager {
 
     func purchase() async {
         guard let product else {
-            state = .failed("Sproutly Pro isn't available right now. Please try again later.")
+            state = .failed(Self.unavailable)
             return
         }
 
@@ -144,7 +153,8 @@ final class PurchaseManager {
             // that never looks again until the app happens to background/foreground.
             await refreshEntitlements()
             if !isPro {
-                state = .failed(error.localizedDescription)
+                sproutlyLog("purchase failed — \(error.localizedDescription)")
+                state = Self.state(for: error)
             }
         }
     }
@@ -158,8 +168,51 @@ final class PurchaseManager {
                 ? .idle
                 : .failed("We couldn't find a previous purchase on this Apple Account.")
         } catch {
-            state = .failed(error.localizedDescription)
+            // AppStore.sync() presents an App Store sign-in sheet, and dismissing it
+            // throws. Without the mapping below, backing out of that sheet showed the
+            // parent a raw system error string for something they chose to do.
+            sproutlyLog("restore failed — \(error.localizedDescription)")
+            state = Self.state(for: error)
         }
+    }
+
+    // MARK: - Error mapping
+
+    /// Turns a StoreKit error into either written copy or silence.
+    ///
+    /// StoreKit's own `localizedDescription` is written for developers and reads
+    /// like a system alert, which is the one register this app is not allowed to
+    /// use. The underlying error still reaches `sproutlyLog`, where it is useful.
+    ///
+    /// Cancelling returns `.idle`, not a failure. Someone who dismisses the sign-in
+    /// sheet has said no, and saying nothing back is the correct response — the same
+    /// thing the `.userCancelled` branch of `purchase()` already does.
+    private static func state(for error: Error) -> PurchaseState {
+        if let storeKitError = error as? StoreKitError {
+            switch storeKitError {
+            case .userCancelled:
+                return .idle
+            case .networkError:
+                return .failed(noConnection)
+            case .notAvailableInStorefront:
+                return .failed("Sproutly Pro isn't available in your App Store region.")
+            default:
+                return .failed(somethingWentWrong)
+            }
+        }
+
+        if let purchaseError = error as? Product.PurchaseError {
+            switch purchaseError {
+            case .productUnavailable:
+                return .failed(unavailable)
+            case .purchaseNotAllowed:
+                return .failed("Purchases are turned off on this device. You can turn them back on in Screen Time settings.")
+            default:
+                return .failed(somethingWentWrong)
+            }
+        }
+
+        return .failed(somethingWentWrong)
     }
 
     // MARK: - Private

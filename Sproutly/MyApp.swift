@@ -235,6 +235,11 @@ struct ContentView: View {
             // Adopts any pre-multi-child data into a real Child.
             childStore.importLegacyProfileIfNeeded()
 
+            // Clears any report or share card stranded by a crash or a force-quit
+            // partway through sharing. ShareSheet removes its own file on dismissal,
+            // so ordinarily there is nothing here.
+            ShareRenderer.clearRenderedFiles()
+
             // Silent restore: the second parent on Family Sharing, or anyone who
             // reinstalled, must never be shown a paywall for something already owned.
             await purchases.start()
