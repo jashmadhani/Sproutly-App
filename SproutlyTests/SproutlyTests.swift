@@ -2463,7 +2463,7 @@ final class PurchaseManagerTests: XCTestCase {
     func testProductIDMatchesTheStoreKitConfiguration() throws {
         // Guards against the ID drifting from Sproutly.storekit / App Store Connect,
         // which would silently break purchasing with no compile error.
-        XCTAssertEqual(PurchaseManager.productID, "com.sproutly.app.pro")
+        XCTAssertEqual(PurchaseManager.productID, "page.sproutly.app.pro")
 
         let url = try XCTUnwrap(Bundle(for: Self.self).url(
             forResource: "Sproutly", withExtension: "storekit"
