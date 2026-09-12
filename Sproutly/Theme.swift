@@ -729,6 +729,20 @@ enum Theme {
     }
     
     static let pediatricianReassurance = "If you are unsure about anything, ask your pediatrician."
+
+    // MARK: - Medical disclaimer
+
+    // Both required claims live here rather than inside a view, so the two places
+    // that show them cannot drift apart: this is educational only, and it is not a
+    // substitute for professional care.
+    //
+    // Onboarding shows this once, on a step the parent swipes past on their first
+    // day. About the Data shows it permanently, which is the copy that actually
+    // does the work: a parent reaches for it at the moment they are worried, which
+    // is months after onboarding and is exactly when the claim needs to be in front
+    // of them. Never let one of these two surfaces carry the text alone.
+    static let medicalDisclaimer = "Sproutly is here to help you notice and remember. It isn't a substitute for professional medical advice, diagnosis, or treatment."
+    static let medicalDisclaimerFollowUp = "Anything you're wondering about is worth asking your pediatrician."
 }
 
 // MARK: - Color Hex Initializer

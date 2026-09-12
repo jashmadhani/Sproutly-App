@@ -20,7 +20,7 @@ struct AboutDataView: View {
                     
                     ZStack {
                         Circle()
-                            .fill(theme.blue.opacity(0.12))
+                            .fill(Theme.iconHalo(for: theme.isNightMode))
                             .frame(width: 120, height: 120)
                         
                         Image(systemName: "info.circle.fill")
@@ -55,6 +55,25 @@ struct AboutDataView: View {
                             .lineSpacing(4)
 
                         Text("Sproutly is an independent educational tool. It is not affiliated with, sponsored by, endorsed by, or reviewed by the CDC, the World Health Organization, or the American Academy of Pediatrics.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(theme.textSecondary)
+                            .lineSpacing(4)
+
+                        // The same two claims onboarding makes, kept reachable. A
+                        // parent looks for this months after onboarding, usually
+                        // because something is worrying them, and that is the moment
+                        // it has to be findable rather than remembered.
+                        DividerLine(nightMode: theme.isNightMode)
+                            .padding(.vertical, 4)
+
+                        Text(Theme.medicalDisclaimer)
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(theme.text)
+                            .lineSpacing(4)
+
+                        Text(Theme.medicalDisclaimerFollowUp)
                             .font(.body)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(theme.textSecondary)

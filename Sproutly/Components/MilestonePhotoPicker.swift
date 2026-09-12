@@ -21,6 +21,13 @@ struct MilestonePhotoPicker: View {
     private static let hasSeenHintKey = "sproutly_has_seen_photo_hint"
     @State private var showNewHint = !UserDefaults.standard.bool(forKey: MilestonePhotoPicker.hasSeenHintKey)
 
+    /// Called from "Delete All Data". The hint introduces a feature, so a parent
+    /// starting over should meet it again rather than have it silently spent on a
+    /// child who no longer exists.
+    static func resetHint() {
+        UserDefaults.standard.removeObject(forKey: hasSeenHintKey)
+    }
+
     var body: some View {
         // Copied into locals first: Data and Bool are Sendable, so the label
         // closure below captures values rather than reaching back into self.
