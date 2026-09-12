@@ -1,17 +1,19 @@
 name: Sproutly
 
-# PLACEHOLDER IDENTITY — replace `com.PLACEHOLDER` throughout before the first
-# App Store submission. A bundle ID is permanent once an app record is created
-# in App Store Connect, and the IAP product ID is permanent once that product is
-# created, so both must be final BEFORE either record exists. The prefix should
-# be the publishing company's reverse-DNS, not a personal name.
+# APP IDENTITY — settled, and effectively permanent. A bundle ID is fixed once
+# an app record exists in App Store Connect (changing it means a new record and
+# the loss of reviews and ranking), and an IAP product ID is fixed once that
+# product exists and cannot be reused even after deletion. Treat both as final.
 #
-# Occurrences to change together: this prefix, both PRODUCT_BUNDLE_IDENTIFIERs
+# The bundle ID is public: Apple's iTunes Lookup API returns it for any app with
+# no authentication, so it carries the product's name rather than a personal one.
+#
+# Occurrences that must stay in sync: this prefix, both PRODUCT_BUNDLE_IDENTIFIERs
 # below, `productID` in Sproutly.storekit, `PurchaseManager.productID`, and the
-# assertion in PurchaseManagerTests that keeps those last two in sync.
+# assertion in PurchaseManagerTests that holds those last two together.
 
 options:
-  bundleIdPrefix: com.PLACEHOLDER
+  bundleIdPrefix: com.sproutly
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -35,7 +37,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Sproutly
-        PRODUCT_BUNDLE_IDENTIFIER: com.PLACEHOLDER.sproutly
+        PRODUCT_BUNDLE_IDENTIFIER: com.sproutly.app
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
 
@@ -85,7 +87,7 @@ targets:
       - target: Sproutly
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.PLACEHOLDER.sproutly.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.sproutly.app.tests
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
