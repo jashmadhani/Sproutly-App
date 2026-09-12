@@ -18,7 +18,7 @@ import Observation
 @Observable
 final class PurchaseManager {
 
-    static let productID = "com.sproutly.app.pro"
+    static let productID = "page.sproutly.app.pro"
 
     // MARK: - Copy
 

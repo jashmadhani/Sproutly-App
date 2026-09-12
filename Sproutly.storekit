@@ -13,7 +13,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.sproutly.app.pro",
+      "productID" : "page.sproutly.app.pro",
       "referenceName" : "Sproutly Pro",
       "type" : "NonConsumable"
     }
