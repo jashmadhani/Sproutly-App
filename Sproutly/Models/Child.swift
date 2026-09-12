@@ -28,6 +28,12 @@ final class Child {
     @Relationship(deleteRule: .cascade, inverse: \Milestone.child)
     var milestones: [Milestone]
 
+    // Optional, unlike `milestones`, because CloudKit requires relationships to be
+    // optional and this one was written for the sharing project from the start.
+    // Cascade: removing a child, or Delete All Data, removes their measurements.
+    @Relationship(deleteRule: .cascade, inverse: \GrowthMeasurement.child)
+    var growthMeasurements: [GrowthMeasurement]? = []
+
     // MARK: - Initializer
 
     init(
@@ -97,6 +103,50 @@ final class Child {
         let missingWeeks = 40 - gestationalWeeks
         let missingMonths = Int(round(Double(missingWeeks) / 4.33))
         return max(0, chronological - missingMonths)
+    }
+
+    /// Corrected age in days on a given date, for the growth chart.
+    ///
+    /// Whole months are right for milestone bands and wrong for a chart: weekly
+    /// weigh-ins at three months would all land on the same point, and the WHO
+    /// curves planned for later are tabulated by day. The correction is the same
+    /// one `correctedAgeMonths` applies — the weeks a child arrived before 40 —
+    /// expressed in days rather than rounded to months, so the two can never
+    /// disagree about whether a child is premature or by how much.
+    static func correctedAgeDays(
+        birthDate: Date,
+        isPremature: Bool,
+        gestationalWeeks: Int,
+        on date: Date
+    ) -> Int {
+        let calendar = Calendar.current
+        let elapsed = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: birthDate),
+            to: calendar.startOfDay(for: date)
+        ).day ?? 0
+        let chronological = max(0, elapsed)
+        guard isPremature else { return chronological }
+        let missingDays = max(0, 40 - gestationalWeeks) * 7
+        return max(0, chronological - missingDays)
+    }
+
+    func correctedAgeDays(on date: Date) -> Int {
+        Self.correctedAgeDays(
+            birthDate: birthDate,
+            isPremature: isPremature,
+            gestationalWeeks: gestationalWeeks,
+            on: date
+        )
+    }
+
+    // MARK: - Growth
+
+    /// Oldest first, which is the order a chart draws in and a report reads in.
+    var sortedGrowthMeasurements: [GrowthMeasurement] {
+        (growthMeasurements ?? []).sorted { lhs, rhs in
+            lhs.date == rhs.date ? lhs.createdAt < rhs.createdAt : lhs.date < rhs.date
+        }
     }
 
     var isCorrectedAge: Bool {

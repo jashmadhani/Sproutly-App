@@ -19,8 +19,12 @@ import SwiftData
 enum SproutlySchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
 
+    // GrowthMeasurement joined V1 before the first TestFlight build, which is the
+    // last moment V1 can change for free. Once a tester has a V1 store on their
+    // phone, editing this list makes the recovery path archive their data. Any
+    // model added after that goes into a SproutlySchemaV2 with a migration stage.
     static var models: [any PersistentModel.Type] {
-        [Child.self, Milestone.self]
+        [Child.self, Milestone.self, GrowthMeasurement.self]
     }
 }
 
