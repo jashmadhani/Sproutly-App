@@ -73,11 +73,23 @@ enum GrowthUnitSystem: Equatable, Sendable {
     private static let poundsPerKilogram = 2.2046226218
     private static let centimetresPerInch = 2.54
 
-    /// Only the US measures babies in pounds and inches. The UK's red book uses
-    /// kilograms and centimetres, so this keys off the measurement system rather
-    /// than language or region families.
-    static func current(locale: Locale = .current) -> GrowthUnitSystem {
+    /// What the phone's region implies. Only the US measures babies in pounds and
+    /// inches; the UK's red book uses kilograms and centimetres, so this keys off
+    /// the measurement system rather than language or region families.
+    ///
+    /// This is the default, not the answer. Use `current()`, which lets a parent's
+    /// own choice in Settings win.
+    static func regional(locale: Locale = .current) -> GrowthUnitSystem {
         locale.measurementSystem == .us ? .imperial : .metric
+    }
+
+    /// The system every screen and the report should use: the parent's choice in
+    /// Settings, or the region when they have left it on Automatic.
+    ///
+    /// Units used to follow the region with no way to change them, which stranded
+    /// a US phone in a metric household on pounds.
+    static func current(defaults: UserDefaults = .standard, locale: Locale = .current) -> GrowthUnitSystem {
+        GrowthUnitPreference.stored(in: defaults).system(locale: locale)
     }
 
     func unitSymbol(for metric: GrowthMetric) -> String {
@@ -105,18 +117,86 @@ enum GrowthUnitSystem: Equatable, Sendable {
         }
     }
 
-    /// A stored metric value, shown in this system: "7.25 kg", "26 in".
+    /// A stored metric value, shown in this system: "7.25 kg", "26 in", "16 lb 4 oz".
     ///
     /// Up to two decimals and never padded, so a clinic's 7.25 keeps its precision
     /// and a home scale's 7 does not grow a meaningless ".00".
+    ///
+    /// Imperial weight is pounds and ounces, because that is what US scales and
+    /// clinics hand a parent. "16.25 lb" would make them convert the number they
+    /// were just given. A whole number of pounds does not trail "0 oz".
     func formatted(_ metricValue: Double, metric: GrowthMetric, locale: Locale = .current) -> String {
-        "\(number(metricValue, metric: metric, locale: locale)) \(unitSymbol(for: metric))"
+        if self == .imperial, metric == .weight {
+            let split = Self.poundsAndOunces(fromKilograms: metricValue)
+            return split.ounces == 0 ? "\(split.pounds) lb" : "\(split.pounds) lb \(split.ounces) oz"
+        }
+        return "\(number(metricValue, metric: metric, locale: locale)) \(unitSymbol(for: metric))"
+    }
+
+    /// Kilograms as whole pounds and whole ounces, rounded to the nearest ounce.
+    ///
+    /// Rounded as a total of ounces first and then split, so 16 lb 15.6 oz becomes
+    /// 17 lb 0 oz rather than the impossible "16 lb 16 oz".
+    static func poundsAndOunces(fromKilograms kilograms: Double) -> (pounds: Int, ounces: Int) {
+        let totalOunces = Int((kilograms * poundsPerKilogram * 16).rounded())
+        return (totalOunces / 16, totalOunces % 16)
     }
 
     /// The number alone, for a field being edited or a chart axis.
     func number(_ metricValue: Double, metric: GrowthMetric, locale: Locale = .current) -> String {
         fromMetric(metricValue, metric: metric)
             .formatted(.number.precision(.fractionLength(0...2)).locale(locale))
+    }
+}
+
+// MARK: - Unit preference
+
+/// The parent's choice in Settings. Stored as a raw string so `@AppStorage` can
+/// hold it and every view reading it redraws when it changes.
+enum GrowthUnitPreference: String, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case metric
+    case imperial
+
+    static let storageKey = "sproutly_measurement_units"
+
+    var id: String { rawValue }
+
+    func system(locale: Locale = .current) -> GrowthUnitSystem {
+        switch self {
+        case .automatic: return .regional(locale: locale)
+        case .metric:    return .metric
+        case .imperial:  return .imperial
+        }
+    }
+
+    /// Missing or unrecognised means Automatic, so a value from a future version
+    /// or a typo never strands a parent in the wrong units.
+    static func stored(in defaults: UserDefaults = .standard) -> GrowthUnitPreference {
+        defaults.string(forKey: storageKey).flatMap(GrowthUnitPreference.init(rawValue:)) ?? .automatic
+    }
+
+    /// The short value shown on the Settings row.
+    var title: String {
+        switch self {
+        case .automatic: return "Automatic"
+        case .metric:    return "Metric"
+        case .imperial:  return "Imperial"
+        }
+    }
+
+    /// The menu choice, naming the actual units so a parent does not have to know
+    /// which system uses which. Automatic names what the region resolves to.
+    func menuTitle(locale: Locale = .current) -> String {
+        switch self {
+        case .automatic:
+            let resolved = system(locale: locale)
+            return "Automatic (\(resolved == .imperial ? "lb, oz, in" : "kg, cm"))"
+        case .metric:
+            return "Metric (kg, cm)"
+        case .imperial:
+            return "Imperial (lb, oz, in)"
+        }
     }
 }
 
@@ -132,6 +212,9 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
     case nothingEntered
     case unreadable(GrowthMetric)
     case outOfRange(GrowthMetric)
+    /// Sixteen or more ounces. Said separately, because "check the weight" does
+    /// not tell a parent which of the two weight fields is wrong.
+    case ouncesOutOfRange
 
     /// What a parent reads under the field. It talks about the number and the
     /// unit, never about the child — a mistyped value is not a finding.
@@ -143,6 +226,8 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
             return "That \(metric.phrase(ageMonths: ageMonths)) isn't a number we can read. Use digits, like 7.2."
         case .outOfRange(let metric):
             return "Check the \(metric.phrase(ageMonths: ageMonths)). It doesn't look like a measurement in \(system.unitSymbol(for: metric))."
+        case .ouncesOutOfRange:
+            return "Check the ounces. They go up to 15, then the next pound starts."
         }
     }
 
@@ -151,6 +236,7 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
         case .nothingEntered:            return nil
         case .unreadable(let metric),
              .outOfRange(let metric):    return metric
+        case .ouncesOutOfRange:          return .weight
         }
     }
 }
@@ -163,6 +249,7 @@ enum GrowthEntryValidator {
     /// sees always refers to the topmost field that needs attention.
     static func validate(
         weight: String,
+        weightOunces: String = "",
         length: String,
         head: String,
         system: GrowthUnitSystem,
@@ -172,13 +259,42 @@ enum GrowthEntryValidator {
         var values = GrowthValues()
         var anyEntered = false
 
+        // Ounces only exist in imperial. In metric a leftover value from before a
+        // unit switch is ignored rather than added to a kilogram figure.
+        let ounceText = system == .imperial
+            ? weightOunces.trimmingCharacters(in: .whitespacesAndNewlines)
+            : ""
+
         for (metric, raw) in fields {
             let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
+            let usesOunces = metric == .weight && !ounceText.isEmpty
+            guard !text.isEmpty || usesOunces else { continue }
             anyEntered = true
 
-            guard let typed = parse(text, locale: locale) else {
-                return .failure(.unreadable(metric))
+            let typed: Double
+            if usesOunces {
+                // Pounds with ounces must be whole pounds. "16.5 lb 3 oz" could
+                // mean two different weights, so it is not guessed at. Empty
+                // pounds with ounces is zero pounds.
+                let pounds: Double
+                if text.isEmpty {
+                    pounds = 0
+                } else {
+                    guard let parsed = parse(text, locale: locale), parsed.rounded() == parsed else {
+                        return .failure(.unreadable(.weight))
+                    }
+                    pounds = parsed
+                }
+                guard let ounces = parse(ounceText, locale: locale) else {
+                    return .failure(.unreadable(.weight))
+                }
+                guard ounces < 16 else { return .failure(.ouncesOutOfRange) }
+                typed = pounds + ounces / 16
+            } else {
+                guard let parsed = parse(text, locale: locale) else {
+                    return .failure(.unreadable(metric))
+                }
+                typed = parsed
             }
 
             let stored = system.toMetric(typed, metric: metric)

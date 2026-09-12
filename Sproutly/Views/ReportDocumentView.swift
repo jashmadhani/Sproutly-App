@@ -93,12 +93,15 @@ struct ReportDocumentView: View {
             // A Grid rather than stacks, so every value lines up under its heading
             // whatever the width of a date in the parent's locale.
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                // Units live in each cell rather than the heading, because an
+                // imperial weight is two units at once ("16 lb 4 oz") and cannot
+                // be expressed as a single "(lb)" column heading.
                 GridRow {
                     columnHeading("Date")
                     columnHeading("Age")
-                    columnHeading("Weight (\(units.unitSymbol(for: .weight)))")
-                    columnHeading("Length / height (\(units.unitSymbol(for: .length)))")
-                    columnHeading("Head (\(units.unitSymbol(for: .head)))")
+                    columnHeading("Weight")
+                    columnHeading("Length / height")
+                    columnHeading("Head")
                 }
 
                 ForEach(report.growth) { row in
@@ -127,11 +130,11 @@ struct ReportDocumentView: View {
             .monospacedDigit()
     }
 
-    /// A number without its unit, since the column heading carries it. An empty
-    /// cell reads as a gap in the table; a dash reads as "not measured".
+    /// A value with its unit. An empty cell reads as a gap in the table; a dash
+    /// reads as "not measured".
     private func value(_ metricValue: Double?, _ metric: GrowthMetric, _ units: GrowthUnitSystem) -> String {
         guard let metricValue else { return "–" }
-        return units.number(metricValue, metric: metric)
+        return units.formatted(metricValue, metric: metric)
     }
 
     private var summary: some View {

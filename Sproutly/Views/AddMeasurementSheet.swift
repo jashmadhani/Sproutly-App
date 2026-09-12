@@ -21,9 +21,12 @@ struct AddMeasurementSheet: View {
     @Environment(ThemeManager.self) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var date: Date
     @State private var weight: String
+    /// Only used in imperial, where weight is pounds plus ounces.
+    @State private var weightOunces: String
     @State private var length: String
     @State private var head: String
     @State private var note: String
@@ -33,26 +36,48 @@ struct AddMeasurementSheet: View {
 
     private enum Field: Hashable {
         case metric(GrowthMetric)
+        case ounces
         case note
     }
 
-    /// Read once. A parent does not change region halfway through typing a weight.
-    private let system = GrowthUnitSystem.current()
+    /// Fixed for the life of the sheet. Settings cannot be reached while it is
+    /// open, and the prefilled text below was written in this system.
+    private let system: GrowthUnitSystem
+
+    /// What the fields said when the sheet opened, so an edit that changes only
+    /// the note does not re-save a weight through display rounding. 7.37 kg shows
+    /// as "16 lb 4 oz"; saving that text back unchanged would quietly store 7.371.
+    private let initialText: [String]
 
     init(child: Child, existing: GrowthMeasurement? = nil) {
         self.child = child
         self.existing = existing
 
         let system = GrowthUnitSystem.current()
+        self.system = system
+
         func text(_ value: Double?, _ metric: GrowthMetric) -> String {
             value.map { system.number($0, metric: metric) } ?? ""
         }
 
+        var poundsText = text(existing?.weightKg, .weight)
+        var ouncesText = ""
+        if system == .imperial, let kilograms = existing?.weightKg {
+            let split = GrowthUnitSystem.poundsAndOunces(fromKilograms: kilograms)
+            poundsText = "\(split.pounds)"
+            ouncesText = split.ounces == 0 ? "" : "\(split.ounces)"
+        }
+
+        let lengthText = text(existing?.lengthCm, .length)
+        let headText = text(existing?.headCm, .head)
+
         _date = State(initialValue: existing?.date ?? Date())
-        _weight = State(initialValue: text(existing?.weightKg, .weight))
-        _length = State(initialValue: text(existing?.lengthCm, .length))
-        _head = State(initialValue: text(existing?.headCm, .head))
+        _weight = State(initialValue: poundsText)
+        _weightOunces = State(initialValue: ouncesText)
+        _length = State(initialValue: lengthText)
+        _head = State(initialValue: headText)
         _note = State(initialValue: existing?.note ?? "")
+        initialText = [poundsText, ouncesText, lengthText, headText]
     }
 
     /// Corrected age on the chosen date, so the length field says "Height" for a
@@ -67,7 +92,8 @@ struct AddMeasurementSheet: View {
     }
 
     private var hasAnyValue: Bool {
-        [weight, length, head].contains { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        let fields = system == .imperial ? [weight, weightOunces, length, head] : [weight, length, head]
+        return fields.contains { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     /// Nothing before birth and nothing in the future. Guarded, because a birth
@@ -99,7 +125,11 @@ struct AddMeasurementSheet: View {
                         .warmCard(nightMode: theme.isNightMode)
 
                         VStack(alignment: .leading, spacing: 16) {
-                            measurementField(.weight, text: $weight)
+                            if system == .imperial {
+                                poundsAndOuncesField
+                            } else {
+                                measurementField(.weight, text: $weight)
+                            }
                             measurementField(.length, text: $length)
                             measurementField(.head, text: $head)
 
@@ -175,7 +205,7 @@ struct AddMeasurementSheet: View {
                 if existing == nil { focused = .metric(.weight) }
             }
             // A message about a value the parent has since changed is stale.
-            .onChange(of: [weight, length, head]) { issue = nil }
+            .onChange(of: [weight, weightOunces, length, head]) { issue = nil }
         }
     }
 
@@ -184,63 +214,125 @@ struct AddMeasurementSheet: View {
     private func measurementField(_ metric: GrowthMetric, text: Binding<String>) -> some View {
         let title = metric.title(ageMonths: ageMonths)
         let unit = system.unitSymbol(for: metric)
-        let isFlagged = issue?.metric == metric
 
         return VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(Theme.sproutlyFieldLabel)
                 .foregroundStyle(theme.textSecondary)
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                TextField(
-                    "",
-                    text: text,
-                    prompt: Text("Optional")
-                        .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
-                )
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.plain)
-                    .font(Theme.sproutlyFieldValue)
-                    .foregroundStyle(theme.text)
-                    .focused($focused, equals: .metric(metric))
-
-                Text(unit)
-                    .font(Theme.sproutlyFieldValue)
-                    .foregroundStyle(theme.textSecondary)
-                    .accessibilityHidden(true)
-            }
-            // The rule runs under the unit too, so "kg" reads as part of the field
-            // rather than a label floating beside it. A flagged field shows the
-            // focused rule weight, which is how the parent finds it.
-            .underlineField(
-                nightMode: theme.isNightMode,
-                isFocused: focused == .metric(metric) || isFlagged
+            unitInput(
+                text: text,
+                unit: unit,
+                prompt: "Optional",
+                field: .metric(metric),
+                isFlagged: issue?.metric == metric,
+                accessibilityLabel: "\(title), in \(unit)"
             )
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(title), in \(unit)")
         }
+    }
+
+    /// Weight in imperial: whole pounds and ounces, the way a US scale or clinic
+    /// reads it out. Side by side, so it reads as one weight; stacked at
+    /// accessibility sizes, where two fields and two units cannot share a line.
+    private var poundsAndOuncesField: some View {
+        let title = GrowthMetric.weight.title(ageMonths: ageMonths)
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 20))
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(Theme.sproutlyFieldLabel)
+                .foregroundStyle(theme.textSecondary)
+
+            layout {
+                unitInput(
+                    text: $weight,
+                    unit: "lb",
+                    prompt: "Optional",
+                    field: .metric(.weight),
+                    isFlagged: issue == .unreadable(.weight) || issue == .outOfRange(.weight),
+                    accessibilityLabel: "\(title), pounds"
+                )
+                unitInput(
+                    text: $weightOunces,
+                    unit: "oz",
+                    prompt: "",
+                    field: .ounces,
+                    isFlagged: issue == .ouncesOutOfRange,
+                    accessibilityLabel: "\(title), ounces"
+                )
+            }
+        }
+    }
+
+    /// A typed number with its unit sitting on the same rule.
+    private func unitInput(
+        text: Binding<String>,
+        unit: String,
+        prompt: String,
+        field: Field,
+        isFlagged: Bool,
+        accessibilityLabel: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            TextField(
+                "",
+                text: text,
+                prompt: Text(prompt)
+                    .foregroundColor(Theme.fieldPlaceholder(for: theme.isNightMode))
+            )
+                .keyboardType(.decimalPad)
+                .textFieldStyle(.plain)
+                .font(Theme.sproutlyFieldValue)
+                .foregroundStyle(theme.text)
+                .focused($focused, equals: field)
+
+            Text(unit)
+                .font(Theme.sproutlyFieldValue)
+                .foregroundStyle(theme.textSecondary)
+                .accessibilityHidden(true)
+        }
+        // The rule runs under the unit too, so "kg" reads as part of the field
+        // rather than a label floating beside it. A flagged field shows the
+        // focused rule weight, which is how the parent finds it.
+        .underlineField(
+            nightMode: theme.isNightMode,
+            isFocused: focused == field || isFlagged
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     // MARK: - Save
 
     private func save() {
         let result = GrowthEntryValidator.validate(
-            weight: weight, length: length, head: head, system: system
+            weight: weight, weightOunces: weightOunces, length: length, head: head, system: system
         )
 
         switch result {
         case .failure(let found):
             issue = found
-            if let metric = found.metric { focused = .metric(metric) }
+            if found == .ouncesOutOfRange {
+                focused = .ounces
+            } else if let metric = found.metric {
+                focused = .metric(metric)
+            }
 
         case .success(let values):
             let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
             if let existing {
+                // A value whose text was not touched keeps its stored precision.
+                // Only what the parent actually changed goes through the typed
+                // text, so correcting a note never nudges a weight.
+                let current = [weight, weightOunces, length, head]
+                let weightUnchanged = current[0] == initialText[0] && current[1] == initialText[1]
                 existing.date = date
-                existing.weightKg = values.weightKg
-                existing.lengthCm = values.lengthCm
-                existing.headCm = values.headCm
+                existing.weightKg = weightUnchanged ? existing.weightKg : values.weightKg
+                existing.lengthCm = current[2] == initialText[2] ? existing.lengthCm : values.lengthCm
+                existing.headCm = current[3] == initialText[3] ? existing.headCm : values.headCm
                 existing.note = trimmedNote
             } else {
                 modelContext.insert(GrowthMeasurement(

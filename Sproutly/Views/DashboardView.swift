@@ -56,6 +56,9 @@ struct DashboardView: View {
     }
 
     @State private var activeSheet: DashboardSheet? = nil
+    // Observed, so the Growth card redraws the moment units change in Settings
+    // rather than on whatever happens to trigger the next body pass.
+    @AppStorage(GrowthUnitPreference.storageKey) private var unitPreference: GrowthUnitPreference = .automatic
     // Read once into state so dismissing it takes effect immediately rather
     // than waiting for the next body pass to re-read UserDefaults.
     @State private var showPhotoNudge = MilestoneLogCounter.shouldShowPhotoNudge
@@ -154,7 +157,7 @@ struct DashboardView: View {
             GrowthSeries.latest(metric, child: child).map { (metric, $0) }
         }
         let lastDate = child.sortedGrowthMeasurements.last?.date
-        let system = GrowthUnitSystem.current()
+        let system = unitPreference.system()
         let age = max(0, child.calculateCorrectedAge())
 
         return Button {
