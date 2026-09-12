@@ -54,6 +54,7 @@ struct SettingsView: View {
     /// are held here. A cancelled sign-in deliberately sets neither.
     @State private var isRestoring = false
     @State private var restoreResult: String?
+    @AppStorage(GrowthUnitPreference.storageKey) private var unitPreference: GrowthUnitPreference = .automatic
     @State private var scrollOffset: CGFloat = 0
     
     private var isCompactHeader: Bool { scrollOffset < -10 }
@@ -66,6 +67,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     headerSection
                     nightModeCard
+                    unitsCard
                     childrenSection
                     profileSection
                     prematuritySection
@@ -210,7 +212,50 @@ struct SettingsView: View {
         .warmCard(nightMode: theme.isNightMode)
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
     }
-    
+
+    // MARK: - Measurement Units
+
+    // Beside Night Mode because both change how the app shows things rather than
+    // what it holds. Measurements are stored in metric, so switching here never
+    // changes a saved value, only how it reads.
+    //
+    // Automatic follows the phone's region, which is what the app did before
+    // there was a choice. It used to be the only behaviour, and it left a US
+    // phone in a metric household with no way off pounds.
+    private var unitsCard: some View {
+        FeatureCardHeader(
+            title: "Measurement units",
+            subtitle: "How weight, length and head size are shown",
+            systemImage: "ruler",
+            nightMode: theme.isNightMode
+        ) {
+            // A Menu with a visible value, the same shape as the Area picker in
+            // Add a Moment, rather than a bare menu Picker, which renders as a
+            // small tinted string with nothing marking it as the row's value.
+            Menu {
+                Picker("Measurement units", selection: $unitPreference) {
+                    ForEach(GrowthUnitPreference.allCases) { option in
+                        Text(option.menuTitle()).tag(option)
+                    }
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(unitPreference.title)
+                        .font(Theme.sproutlyFieldValue)
+                        .foregroundStyle(theme.blueText)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(theme.blueText)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Measurement units")
+            .accessibilityValue(unitPreference.menuTitle())
+        }
+        .warmCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - Pro
 
     // One quiet door, for the parent who never happens to tap a locked feature
@@ -874,8 +919,10 @@ struct SettingsView: View {
     }
 
     private func deleteAllData() {
-        // Roll back to light mode (default mode)
+        // Roll back to light mode (default mode), and units back to the region,
+        // the same "as installed" state a fresh start implies.
         theme.isNightMode = false
+        unitPreference = .automatic
 
         // Deleting each child cascades to their milestones, and `ChildStore.delete`
         // also removes their photo files and per-child keys, which the cascade does

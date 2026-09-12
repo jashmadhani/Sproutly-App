@@ -29,10 +29,50 @@ final class GrowthUnitTests: XCTestCase {
     // Only the US weighs babies in pounds and measures in inches. The UK red book
     // uses kilograms and centimetres, so "English-speaking" is not the test.
     func testOnlyTheUSUsesImperial() {
-        XCTAssertEqual(GrowthUnitSystem.current(locale: us), .imperial)
-        XCTAssertEqual(GrowthUnitSystem.current(locale: uk), .metric)
-        XCTAssertEqual(GrowthUnitSystem.current(locale: india), .metric)
-        XCTAssertEqual(GrowthUnitSystem.current(locale: germany), .metric)
+        XCTAssertEqual(GrowthUnitSystem.regional(locale: us), .imperial)
+        XCTAssertEqual(GrowthUnitSystem.regional(locale: uk), .metric)
+        XCTAssertEqual(GrowthUnitSystem.regional(locale: india), .metric)
+        XCTAssertEqual(GrowthUnitSystem.regional(locale: germany), .metric)
+    }
+
+    // A parent's own choice beats the phone's region. A family living in the US
+    // with a pediatrician abroad, or a US phone in a metric household, must not be
+    // stuck with whichever system the region implies.
+    func testPreferenceOverridesTheRegionAndAutomaticFollowsIt() {
+        XCTAssertEqual(GrowthUnitPreference.automatic.system(locale: us), .imperial)
+        XCTAssertEqual(GrowthUnitPreference.automatic.system(locale: uk), .metric)
+        XCTAssertEqual(GrowthUnitPreference.metric.system(locale: us), .metric)
+        XCTAssertEqual(GrowthUnitPreference.imperial.system(locale: uk), .imperial)
+    }
+
+    func testNoStoredChoiceMeansAutomatic() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "GrowthUnitTests-\(UUID().uuidString)"))
+        XCTAssertEqual(GrowthUnitPreference.stored(in: defaults), .automatic)
+
+        defaults.set(GrowthUnitPreference.metric.rawValue, forKey: GrowthUnitPreference.storageKey)
+        XCTAssertEqual(GrowthUnitPreference.stored(in: defaults), .metric)
+        XCTAssertEqual(GrowthUnitSystem.current(defaults: defaults, locale: us), .metric)
+
+        // An unrecognised value falls back rather than crashing or guessing.
+        defaults.set("furlongs", forKey: GrowthUnitPreference.storageKey)
+        XCTAssertEqual(GrowthUnitPreference.stored(in: defaults), .automatic)
+    }
+
+    // US scales and clinics give baby weight as pounds and ounces. "16.25 lb"
+    // makes a parent do arithmetic on the number they were just handed.
+    func testImperialWeightIsShownInPoundsAndOunces() {
+        let imperial = GrowthUnitSystem.imperial
+        XCTAssertEqual(imperial.formatted(imperial.toMetric(16.25, metric: .weight), metric: .weight, locale: us), "16 lb 4 oz")
+        // A whole number of pounds does not trail "0 oz".
+        XCTAssertEqual(imperial.formatted(imperial.toMetric(16, metric: .weight), metric: .weight, locale: us), "16 lb")
+        // 15.6 ounces rounds up to a whole pound, not to "16 lb 16 oz".
+        XCTAssertEqual(imperial.formatted(imperial.toMetric(16.975, metric: .weight), metric: .weight, locale: us), "17 lb")
+    }
+
+    func testPoundsAndOuncesSplitRoundsToTheNearestOunce() {
+        let split = GrowthUnitSystem.poundsAndOunces(fromKilograms: GrowthUnitSystem.imperial.toMetric(7.53, metric: .weight))
+        XCTAssertEqual(split.pounds, 7)
+        XCTAssertEqual(split.ounces, 8)
     }
 
     func testConversionsRoundTrip() {
@@ -108,6 +148,49 @@ final class GrowthEntryValidatorTests: XCTestCase {
         XCTAssertEqual(values.lengthCm ?? 0, 66.04, accuracy: 0.001)
     }
 
+    func testPoundsAndOuncesAreCombinedBeforeStoring() throws {
+        let values = try GrowthEntryValidator.validate(
+            weight: "16", weightOunces: "4", length: "", head: "",
+            system: .imperial, locale: us
+        ).get()
+        XCTAssertEqual(values.weightKg ?? 0, 16.25 / 2.2046226218, accuracy: 0.0001)
+    }
+
+    // Decimal pounds on their own still work, for a parent copying "16.5 lb".
+    // (One decimal on purpose: a two-decimal string literal trips the
+    // no-hardcoded-price guard, which rightly reads it as a price.)
+    func testDecimalPoundsWithoutOuncesAreAccepted() throws {
+        let values = try GrowthEntryValidator.validate(
+            weight: "16.5", weightOunces: "", length: "", head: "",
+            system: .imperial, locale: us
+        ).get()
+        XCTAssertEqual(values.weightKg ?? 0, 16.5 / 2.2046226218, accuracy: 0.0001)
+    }
+
+    func testOuncesMustBeUnderSixteen() {
+        XCTAssertEqual(
+            GrowthEntryValidator.validate(weight: "16", weightOunces: "16", length: "", head: "", system: .imperial, locale: us).issue,
+            .ouncesOutOfRange
+        )
+    }
+
+    // "16.5 lb 3 oz" could mean two different weights, so it is not guessed at.
+    func testDecimalPoundsCombinedWithOuncesIsUnreadable() {
+        XCTAssertEqual(
+            GrowthEntryValidator.validate(weight: "16.5", weightOunces: "3", length: "", head: "", system: .imperial, locale: us).issue,
+            .unreadable(.weight)
+        )
+    }
+
+    // Metric has no ounces field; a stale value from a unit switch is ignored.
+    func testMetricIgnoresOunces() throws {
+        let values = try GrowthEntryValidator.validate(
+            weight: "7.2", weightOunces: "9", length: "", head: "",
+            system: .metric, locale: uk
+        ).get()
+        XCTAssertEqual(values.weightKg, 7.2)
+    }
+
     // The range exists to catch a unit mistake, not to judge a child. 72 in a
     // kilogram field is almost certainly pounds, and saving it would draw a
     // frightening spike on the chart.
@@ -130,7 +213,7 @@ final class GrowthEntryValidatorTests: XCTestCase {
     func testIssueMessagesPointAtTheNumberNotTheChild() {
         let banned = ["too small", "too big", "underweight", "overweight", "concern", "worry", "abnormal"]
         let issues: [GrowthEntryIssue] = [.nothingEntered, .unreadable(.weight), .outOfRange(.weight),
-                                          .outOfRange(.length), .outOfRange(.head)]
+                                          .outOfRange(.length), .outOfRange(.head), .ouncesOutOfRange]
 
         for issue in issues {
             for system in [GrowthUnitSystem.metric, .imperial] {

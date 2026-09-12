@@ -37,9 +37,10 @@ struct GrowthView: View {
     @State private var selectedMetric: GrowthMetric
     @State private var pendingDelete: GrowthMeasurement?
 
-    /// Read once per appearance. A region change mid-session is not worth a
-    /// chart that silently rescales under the parent's finger.
-    private let system = GrowthUnitSystem.current()
+    /// The parent's choice in Settings, or the region on Automatic. Held in
+    /// `@AppStorage` so the chart and history redraw if it changes.
+    @AppStorage(GrowthUnitPreference.storageKey) private var unitPreference: GrowthUnitPreference = .automatic
+    private var system: GrowthUnitSystem { unitPreference.system() }
 
     init(child: Child) {
         self.child = child
