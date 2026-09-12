@@ -18,7 +18,7 @@ import Observation
 @Observable
 final class PurchaseManager {
 
-    static let productID = "com.PLACEHOLDER.sproutly.pro"
+    static let productID = "com.sproutly.app.pro"
 
     enum PurchaseState: Equatable {
         case idle
