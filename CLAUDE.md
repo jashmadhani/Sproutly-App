@@ -538,7 +538,10 @@ The first tracker beyond milestones: weight, length/height and head size, logged
 
 **Model.** `GrowthMeasurement` is one measuring session with three optional values, because real life hands a parent partial data. It joined `SproutlySchemaV1` before the first TestFlight build — the last moment V1 could change for free. Any model added from here on goes into a `SproutlySchemaV2` with a migration stage, or the recovery path archives testers' stores.
 
-- **Stored metric, shown in the parent's units.** Only `Locale.measurementSystem == .us` gets lb/in; the UK red book uses kg/cm, so language is not the test. A region change must never alter a stored value.
+- **Stored metric, shown in the parent's units.** A region or setting change must never alter a stored value.
+- **Units are the parent's choice.** Settings has a *Measurement units* card beside Night Mode: Automatic (default), Metric (kg, cm) or Imperial (lb, oz, in), stored as `GrowthUnitPreference` under `sproutly_measurement_units`. Automatic uses `GrowthUnitSystem.regional`, where only `Locale.measurementSystem == .us` gets imperial (the UK red book uses kg/cm, so language is not the test). Every surface goes through `GrowthUnitSystem.current()` or an `@AppStorage` of the preference, never `regional` directly. Units used to follow the region with no override, which left a US phone in a metric household stuck on pounds. Delete All Data resets it to Automatic along with Night Mode.
+- **Imperial weight is pounds and ounces**, the way US scales and clinics give it: two fields in `AddMeasurementSheet` (side by side, stacked at accessibility sizes), shown as "16 lb 4 oz" or "16 lb". `GrowthUnitSystem.poundsAndOunces` rounds *total* ounces before splitting, so 15.6 oz carries to the next pound rather than printing "16 lb 16 oz". Pounds combined with ounces must be whole; decimal pounds alone are accepted; 16+ ounces is `.ouncesOutOfRange`. The report puts units in each cell for the same reason: "16 lb 4 oz" cannot sit under a single "(lb)" heading.
+- **Editing never re-saves untouched values through display rounding.** `AddMeasurementSheet` keeps the text each field opened with; a field left unchanged keeps its stored value. Otherwise correcting only a note would quietly turn 7.37 kg into 7.371 kg via "16 lb 4 oz".
 - **Age is computed, never stored.** A parent can still correct a birth date or gestational weeks, and a saved age would silently keep the old answer. `Child.correctedAgeDays(on:)` applies the same correction as `correctedAgeMonths` at day precision — `CorrectedAgeDaysTests` holds the two together.
 - **iCloud-ready, deliberately unlike `Milestone`.** Every property is defaulted or optional and `Child.growthMeasurements` is an optional relationship, which is what CloudKit requires. The two-parent sharing project should not need to reopen this model; converting `Milestone`/`Child.milestones` belongs to that project.
 
@@ -573,7 +576,7 @@ Permission is requested only from an explicit tap (the Settings master switch, o
 
 ## UserDefaults keys
 
-`sproutly_active_child_id` · `nightModeEnabled` · `sproutly_did_show_store_recovery_notice` · `sproutly_profile` / `elitegrowth_profile` (legacy) · `sproutly_catalog_baseline_<childUUID>` · `sproutly_daily_card_dismissed_<childUUID>` · `sproutly_logged_milestone_count` · `sproutly_photo_nudge_dismissed` · `sproutly_notify_master` · `sproutly_notify_<kind>` · `sproutly_notify_authorization_denied` · `sproutly_notify_has_asked` · `sproutly_notify_prompt_dismissed` · `sproutly_last_opened`
+`sproutly_active_child_id` · `nightModeEnabled` · `sproutly_did_show_store_recovery_notice` · `sproutly_profile` / `elitegrowth_profile` (legacy) · `sproutly_catalog_baseline_<childUUID>` · `sproutly_daily_card_dismissed_<childUUID>` · `sproutly_logged_milestone_count` · `sproutly_photo_nudge_dismissed` · `sproutly_notify_master` · `sproutly_notify_<kind>` · `sproutly_notify_authorization_denied` · `sproutly_notify_has_asked` · `sproutly_notify_prompt_dismissed` · `sproutly_last_opened` · `sproutly_measurement_units`
 
 Per-child keys are cleared in `ChildStore.delete`; the cascade does not reach them.
 
