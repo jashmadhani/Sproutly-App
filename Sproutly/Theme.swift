@@ -875,6 +875,11 @@ struct FormRow<Value: View>: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    /// The glyph column grows with the glyph. Pinned at 22pt, a render at the
+    /// largest text size drew the calendar icon past its column, over the card
+    /// edge and into the label beside it.
+    @ScaledMetric(relativeTo: .body) private var glyphColumn: CGFloat = 22
+
     var body: some View {
         // At accessibility text sizes a label and its value cannot share a line
         // without one of them truncating, so the row becomes two lines.
@@ -887,7 +892,7 @@ struct FormRow<Value: View>: View {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .foregroundStyle(Theme.accentBlueText(for: nightMode))
-                        .frame(width: 22)
+                        .frame(width: glyphColumn)
                 }
                 Text(label)
                     .font(Theme.sproutlyFieldValue)

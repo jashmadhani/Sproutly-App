@@ -18,6 +18,7 @@ struct GrowthView: View {
     @Environment(ThemeManager.self) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // One sheet binding for this screen, like every other view that owns modals.
     private enum GrowthSheet: Identifiable {
@@ -225,7 +226,9 @@ struct GrowthView: View {
             now: measurement.date
         )
 
-        return HStack(spacing: 8) {
+        // Top-aligned at accessibility sizes, where a row wraps to several lines
+        // and a centred menu button would float halfway down the text.
+        return HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 8) {
             Button {
                 activeSheet = .edit(measurement)
             } label: {
@@ -267,6 +270,10 @@ struct GrowthView: View {
                 Image(systemName: "ellipsis.circle")
                     .sproutlyRowIcon()
                     .foregroundStyle(theme.textSecondary)
+                    // The glyph is an affordance, not reading text. Uncapped, at
+                    // the largest size it grew past its 44pt frame and drew over
+                    // the row's own words. The text beside it still scales fully.
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
