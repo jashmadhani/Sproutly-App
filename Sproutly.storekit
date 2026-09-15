@@ -13,13 +13,12 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.PLACEHOLDER.sproutly.pro",
+      "productID" : "page.sproutly.app.pro",
       "referenceName" : "Sproutly Pro",
       "type" : "NonConsumable"
     }
   ],
   "settings" : {
-    "_applicationInternalID" : "6448936300",
     "_developerTeamID" : "FDYHXN3XSH",
     "_lastSynchronizedDate" : 0
   },

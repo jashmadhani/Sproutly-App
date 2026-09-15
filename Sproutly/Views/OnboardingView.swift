@@ -295,7 +295,7 @@ private extension OnboardingView {
             Group {
                 ZStack {
                     Circle()
-                        .fill(theme.blue.opacity(0.12))
+                        .fill(Theme.iconHalo(for: theme.isNightMode))
                         .frame(width: 120, height: 120)
 
                     Image(systemName: "info.circle.fill")
@@ -317,13 +317,13 @@ private extension OnboardingView {
                     // version leaned on an "X — not Y" apposition, which is the
                     // construction that made the screen read as generated
                     // rather than written. Short sentences instead.
-                    Text("Sproutly is here to help you notice and remember. It isn't a substitute for professional medical advice, diagnosis, or treatment.")
+                    Text(Theme.medicalDisclaimer)
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.text)
                         .lineSpacing(4)
 
-                    Text("Anything you're wondering about is worth asking your pediatrician.")
+                    Text(Theme.medicalDisclaimerFollowUp)
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(theme.textSecondary)
@@ -351,7 +351,7 @@ private extension OnboardingView {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(theme.blue.opacity(0.12))
+                            .fill(Theme.iconHalo(for: theme.isNightMode))
                             .frame(width: 60, height: 60)
 
                         Image(systemName: "person.crop.circle.fill")

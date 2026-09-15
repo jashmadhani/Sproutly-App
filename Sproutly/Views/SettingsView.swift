@@ -50,6 +50,11 @@ struct SettingsView: View {
     @FocusState private var isProfileNameFocused: Bool
     @State private var showRemoveChildAlert = false
     @State private var childToDelete: Child?
+    /// Restore runs from a row rather than a sheet, so its progress and its result
+    /// are held here. A cancelled sign-in deliberately sets neither.
+    @State private var isRestoring = false
+    @State private var restoreResult: String?
+    @AppStorage(GrowthUnitPreference.storageKey) private var unitPreference: GrowthUnitPreference = .automatic
     @State private var scrollOffset: CGFloat = 0
     
     private var isCompactHeader: Bool { scrollOffset < -10 }
@@ -62,6 +67,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     headerSection
                     nightModeCard
+                    unitsCard
                     childrenSection
                     profileSection
                     prematuritySection
@@ -127,6 +133,17 @@ struct SettingsView: View {
             }
         } message: {
             Text("This permanently removes \(childToDelete?.displayName ?? "this child") and their milestones. Other children are not affected.")
+        }
+        .alert(
+            "Restore Purchases",
+            isPresented: Binding(
+                get: { restoreResult != nil },
+                set: { if !$0 { restoreResult = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { restoreResult = nil }
+        } message: {
+            Text(restoreResult ?? "")
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -195,7 +212,50 @@ struct SettingsView: View {
         .warmCard(nightMode: theme.isNightMode)
         .animation(.easeInOut(duration: 0.4), value: theme.isNightMode)
     }
-    
+
+    // MARK: - Measurement Units
+
+    // Beside Night Mode because both change how the app shows things rather than
+    // what it holds. Measurements are stored in metric, so switching here never
+    // changes a saved value, only how it reads.
+    //
+    // Automatic follows the phone's region, which is what the app did before
+    // there was a choice. It used to be the only behaviour, and it left a US
+    // phone in a metric household with no way off pounds.
+    private var unitsCard: some View {
+        FeatureCardHeader(
+            title: "Measurement units",
+            subtitle: "How weight, length and head size are shown",
+            systemImage: "ruler",
+            nightMode: theme.isNightMode
+        ) {
+            // A Menu with a visible value, the same shape as the Area picker in
+            // Add a Moment, rather than a bare menu Picker, which renders as a
+            // small tinted string with nothing marking it as the row's value.
+            Menu {
+                Picker("Measurement units", selection: $unitPreference) {
+                    ForEach(GrowthUnitPreference.allCases) { option in
+                        Text(option.menuTitle()).tag(option)
+                    }
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(unitPreference.title)
+                        .font(Theme.sproutlyFieldValue)
+                        .foregroundStyle(theme.blueText)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(theme.blueText)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Measurement units")
+            .accessibilityValue(unitPreference.menuTitle())
+        }
+        .warmCard(nightMode: theme.isNightMode)
+    }
+
     // MARK: - Pro
 
     // One quiet door, for the parent who never happens to tap a locked feature
@@ -710,6 +770,35 @@ struct SettingsView: View {
 
             rowDivider
 
+            // Restore also sits on the paywall, but that screen is reach-triggered.
+            // A parent who reinstalls, or moves to a new phone, opens the app to find
+            // their features locked and no obvious route back to something they have
+            // already paid for. Entitlements do re-check at launch, so most people
+            // never need this — the ones who do had nowhere to go. Hidden once Pro is
+            // owned, where it would only be a row that does nothing.
+            if !purchases.isPro {
+                Button {
+                    Task { await restorePurchases() }
+                } label: {
+                    settingsRow(
+                        icon: "arrow.clockwise",
+                        iconColor: theme.textSecondary,
+                        title: "Restore Purchases",
+                        titleColor: theme.text
+                    ) {
+                        if isRestoring {
+                            ProgressView()
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isRestoring)
+                .accessibilityLabel("Restore Purchases")
+                .accessibilityHint("Looks for a previous Sproutly Pro purchase on this Apple Account")
+
+                rowDivider
+            }
+
             Button {
                 activeSheet = .aboutData
             } label: {
@@ -792,7 +881,27 @@ struct SettingsView: View {
 
     
     // MARK: - Actions
-    
+
+    // Says something only when there is something to say. A restore that finds a
+    // purchase confirms it, and a restore that finds none explains that. Backing
+    // out of the App Store sign-in sheet leaves `state` at `.idle` with nothing
+    // unlocked, which is a parent changing their mind rather than a failure, so it
+    // passes silently.
+    private func restorePurchases() async {
+        isRestoring = true
+        await purchases.restore()
+        isRestoring = false
+
+        switch purchases.state {
+        case .failed(let message):
+            restoreResult = message
+        case .idle where purchases.isPro:
+            restoreResult = "Your purchase is back. Sproutly Pro is unlocked on this device."
+        case .idle, .purchasing:
+            break
+        }
+    }
+
     // Scoped to the active child only — a sibling's progress is never touched.
     private func resetProgress() {
         guard let active = childStore.activeChild else { return }
@@ -810,13 +919,32 @@ struct SettingsView: View {
     }
 
     private func deleteAllData() {
-        // Roll back to light mode (default mode)
+        // Roll back to light mode (default mode), and units back to the region,
+        // the same "as installed" state a fresh start implies.
         theme.isNightMode = false
+        unitPreference = .automatic
 
-        // Deleting each child cascades to their milestones.
+        // Deleting each child cascades to their milestones, and `ChildStore.delete`
+        // also removes their photo files and per-child keys, which the cascade does
+        // not reach.
         for child in childStore.children {
             childStore.delete(child)
         }
+
+        // The app's memory of how far along this parent is lives outside SwiftData
+        // and outside the per-child keys, so nothing above touches it. Left behind,
+        // a wipe returns a parent to the welcome screen carrying a log count from
+        // children who no longer exist: the photo nudge then fires on the very first
+        // milestone of a new child, or never fires at all because it was already
+        // dismissed. Both read as the app being confused about who it is looking at.
+        //
+        // The notification keys are deliberately not cleared. `sproutly_notify_has_asked`
+        // and `sproutly_notify_authorization_denied` mirror a decision made at the
+        // system level, which deleting app data does not undo — clearing them would
+        // make the app ask again, and iOS would refuse without showing the parent
+        // anything. That prompt is gated on the log count anyway, which is reset here.
+        MilestoneLogCounter.reset()
+        MilestonePhotoPicker.resetHint()
 
         LegacyProfile.clear()
         childStore.refresh()

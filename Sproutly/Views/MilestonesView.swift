@@ -32,6 +32,7 @@ struct MilestonesView: View {
     private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var selectedFilter: MilestoneFilter = .thisStage
     @State private var expandedDomains: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
@@ -232,7 +233,17 @@ struct MilestonesView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top) {
+        // At accessibility sizes the title and the button cannot share a line. A
+        // render at the largest size split the title mid-word ("Milest" / "ones")
+        // and squeezed "Add moment" to one letter per line down half the screen.
+        // The button moves under the title instead, the same reflow FormRow and
+        // FeatureCardHeader use.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14))
+            : AnyLayout(HStackLayout(alignment: .top))
+
+        return layout {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Milestones")
                     .font(.sproutlyDisplay(30))
@@ -245,7 +256,7 @@ struct MilestonesView: View {
                     .foregroundStyle(theme.textSecondary)
             }
 
-            Spacer()
+            if !stacked { Spacer() }
 
             Button {
                 Task { @MainActor in
@@ -343,48 +354,15 @@ struct MilestonesView: View {
 
     // MARK: - Filter Picker
 
-    // A hand-built segmented control rather than `.pickerStyle(.segmented)`.
-    //
-    // UIKit draws that one on a #CCD8CC track — 1.13:1 against the page, so it
-    // barely separates — and gives the selected segment a *pure white* pill.
-    // Pure white is now the floating dock and nothing else; a second pure-white
-    // surface halfway up the screen breaks the ladder that separation depends
-    // on. The selected pill is the card colour, which is what every other
-    // raised surface in the app uses.
+    // The app's own segmented control, not `.pickerStyle(.segmented)` — see
+    // SproutlySegmentedControl for why the system one breaks the surface ladder.
     private var filterPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(MilestoneFilter.allCases, id: \.self) { filter in
-                let isSelected = selectedFilter == filter
-                Button {
-                    selectedFilter = filter
-                } label: {
-                    Text(filter.rawValue)
-                        .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? theme.text : theme.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                .fill(isSelected ? theme.card : Color.clear)
-                                .shadow(
-                                    color: isSelected ? theme.cardShadow : .clear,
-                                    radius: 4, x: 0, y: 2
-                                )
-                        )
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-            }
-        }
-        .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 999, style: .continuous)
-                .fill(theme.recessedFill)
-        )
+        SproutlySegmentedControl(
+            options: MilestoneFilter.allCases,
+            selection: $selectedFilter,
+            accessibilityLabel: "Milestone filter"
+        ) { $0.rawValue }
         .padding(.horizontal, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Milestone filter")
     }
 
     // MARK: - Domain Groups

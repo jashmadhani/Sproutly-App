@@ -1954,6 +1954,40 @@ final class DisclaimerTests: XCTestCase {
         }
     }
 
+    // The disclaimer has to outlive onboarding.
+    //
+    // It used to appear on exactly one screen: a step the parent swipes past on
+    // their first day and can never reach again. A parent looks for this months
+    // later, usually because something has started worrying them, and that is the
+    // moment it has to be findable. About the Data is where they land.
+    //
+    // Asserting on the shared constants rather than the sentences, so the copy can
+    // still be rewritten — what may not happen is one of these two screens quietly
+    // becoming the only one that carries it.
+    func testMedicalDisclaimerIsReachableOutsideOnboarding() throws {
+        let theme = try source("Sproutly/Theme.swift")
+        // Matched from "substitute" onward so the sentence can still be rewritten
+        // around it ("isn't" / "is not" / "is not intended as"). What has to survive
+        // is the claim, not one phrasing of it.
+        XCTAssertTrue(
+            theme.contains("substitute for professional medical advice, diagnosis, or treatment"),
+            "the educational-only claim must survive in Theme"
+        )
+        XCTAssertTrue(
+            theme.contains("medicalDisclaimerFollowUp"),
+            "the pediatrician follow-up must survive in Theme"
+        )
+
+        for path in ["Sproutly/Views/OnboardingView.swift",
+                     "Sproutly/Views/AboutDataView.swift"] {
+            let text = try source(path)
+            XCTAssertTrue(
+                text.contains("Theme.medicalDisclaimer"),
+                "\(path) no longer shows the medical disclaimer"
+            )
+        }
+    }
+
     // The listing reference exists and is outside the compiled target.
     func testListingReferenceExistsAndIsNotInTheTarget() throws {
         let listing = repoRoot.appendingPathComponent("AppStore/LISTING.md")
@@ -2088,8 +2122,16 @@ final class UIRegressionTests: XCTestCase {
             for line in text.components(separatedBy: .newlines) {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 guard !trimmed.hasPrefix("//") else { continue }
+
+                // A context menu renders a `Label` and nothing else, so `ProLockBadge`
+                // cannot go there and `Label(…, systemImage: "lock.fill")` is the only
+                // way to mark that row. Allowed, but named here so it stays a decision
+                // rather than the accident it was: the check below used to look only
+                // for the `Image` form, and the Label form walked straight past it.
+                if trimmed.contains("systemImage:") { continue }
+
                 XCTAssertFalse(
-                    line.contains("Image(systemName: \"lock.fill\")"),
+                    line.contains("\"lock.fill\""),
                     "\(url.lastPathComponent) draws its own lock instead of ProLockBadge"
                 )
             }
@@ -2421,7 +2463,7 @@ final class PurchaseManagerTests: XCTestCase {
     func testProductIDMatchesTheStoreKitConfiguration() throws {
         // Guards against the ID drifting from Sproutly.storekit / App Store Connect,
         // which would silently break purchasing with no compile error.
-        XCTAssertEqual(PurchaseManager.productID, "com.PLACEHOLDER.sproutly.pro")
+        XCTAssertEqual(PurchaseManager.productID, "page.sproutly.app.pro")
 
         let url = try XCTUnwrap(Bundle(for: Self.self).url(
             forResource: "Sproutly", withExtension: "storekit"
@@ -2442,5 +2484,32 @@ final class PurchaseManagerTests: XCTestCase {
             XCTAssertFalse(reason.headline.isEmpty)
         }
         XCTAssertEqual(PaywallReason.allFeatures.count, 6)
+    }
+}
+
+// MARK: - Milestones header
+
+// Seen on a render at the largest text size: the title split mid-word
+// ("Milest" / "ones") and "Add moment" stacked one letter per line, because the
+// title and the button were forced onto one line. The header must reflow.
+final class MilestonesHeaderRegressionTests: XCTestCase {
+
+    func testHeaderReflowsAtAccessibilitySizes() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let text = try String(
+            contentsOf: root.appendingPathComponent("Sproutly/Views/MilestonesView.swift"),
+            encoding: .utf8
+        )
+
+        guard let start = text.range(of: "private var headerSection: some View"),
+              let end = text.range(of: "private var ageDescription", range: start.upperBound..<text.endIndex) else {
+            return XCTFail("headerSection not found")
+        }
+        let header = String(text[start.upperBound..<end.lowerBound])
+
+        XCTAssertTrue(header.contains("isAccessibilitySize"), "the header must check for accessibility sizes")
+        XCTAssertTrue(header.contains("VStackLayout"), "the header must stack at accessibility sizes")
     }
 }

@@ -44,16 +44,21 @@ struct DashboardView: View {
     private enum DashboardSheet: Identifiable {
         case share(ShareItem)
         case paywall(PaywallReason)
+        case growth
 
         var id: String {
             switch self {
             case .share(let item):     return "share-\(item.id)"
             case .paywall(let reason): return "paywall-\(reason.id)"
+            case .growth:              return "growth"
             }
         }
     }
 
     @State private var activeSheet: DashboardSheet? = nil
+    // Observed, so the Growth card redraws the moment units change in Settings
+    // rather than on whatever happens to trigger the next body pass.
+    @AppStorage(GrowthUnitPreference.storageKey) private var unitPreference: GrowthUnitPreference = .automatic
     // Read once into state so dismissing it takes effect immediately rather
     // than waiting for the next body pass to re-read UserDefaults.
     @State private var showPhotoNudge = MilestoneLogCounter.shouldShowPhotoNudge
@@ -101,6 +106,8 @@ struct DashboardView: View {
                         comingSoonCard
                     }
 
+                    growthCard
+
                     growthInsightsSection
                     recentMomentsCard
                     screeningCards
@@ -135,8 +142,76 @@ struct DashboardView: View {
             switch sheet {
             case .share(let item):     ShareSheet(url: item.url)
             case .paywall(let reason): PaywallView(reason: reason)
+            case .growth:              GrowthView(child: child)
             }
         }
+    }
+
+    // MARK: - Growth
+
+    // Free, so no lock. Placed straight after the milestone overview: it is the
+    // other half of "how is my child doing", and further down it would sit below
+    // three cards a parent scrolls past to reach it.
+    private var growthCard: some View {
+        let latest = GrowthMetric.allCases.compactMap { metric in
+            GrowthSeries.latest(metric, child: child).map { (metric, $0) }
+        }
+        let lastDate = child.sortedGrowthMeasurements.last?.date
+        let system = unitPreference.system()
+        let age = max(0, child.calculateCorrectedAge())
+
+        return Button {
+            activeSheet = .growth
+        } label: {
+            VStack(alignment: .leading, spacing: 14) {
+                FeatureCardHeader(
+                    title: "Growth",
+                    subtitle: lastDate.map {
+                        "Last measured \($0.formatted(date: .abbreviated, time: .omitted))"
+                    } ?? "Add weight, length or head size and see how they change",
+                    systemImage: "ruler",
+                    nightMode: theme.isNightMode,
+                    diameter: 44,
+                    glyphSize: 19
+                ) {
+                    Image(systemName: "chevron.right")
+                        .sproutlyRowIcon()
+                        .foregroundStyle(theme.textSecondary)
+                }
+
+                if !latest.isEmpty {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                        : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+
+                    layout {
+                        ForEach(latest, id: \.0) { metric, point in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(metric.title(ageMonths: age))
+                                    .font(Theme.sproutlyMeta)
+                                    .foregroundStyle(theme.textSecondary)
+                                Text(system.formatted(point.value, metric: metric))
+                                    .font(Theme.sproutlyCardTitle)
+                                    .foregroundStyle(theme.text)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .warmCard(nightMode: theme.isNightMode)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Growth")
+        .accessibilityValue(
+            latest.map { metric, point in
+                "\(metric.title(ageMonths: age)) \(system.formatted(point.value, metric: metric))"
+            }.joined(separator: ", ")
+        )
+        .accessibilityHint("Opens growth for \(child.displayName)")
     }
 
     // MARK: - Report (feature C)

@@ -291,22 +291,18 @@ enum PaywallReason: Identifiable {
 // MARK: - Links
 
 enum AppLinks {
-    // PLACEHOLDER — must be replaced with the real product domain before the
-    // first submission. App Review opens the privacy link from the paywall and
-    // App Store Connect requires a reachable support URL, so a dead host is a
-    // rejection. These previously pointed at a personal domain carrying the
-    // founder's surname, which is public to every reviewer and customer; the
-    // replacement should be a product domain, not a personal one.
+    // Subdomains of the Sproutly product domain, deliberately separate from the
+    // personal portfolio: a parent following this link should land on the app's
+    // own site, not on a CV. Each is its own host so either can be repointed
+    // without touching the other.
     //
-    // Served as static pages from the Sproutly product site, deliberately
-    // separate from the personal portfolio — a parent following this link should
-    // land on the app's own site, not on a CV. App Review follows the privacy
-    // link from the paywall and the support link from App Store Connect, so both
-    // must stay reachable for as long as the app is on sale; they are not
-    // marketing pages that can be retired. Changing either means a new build,
-    // since they are compiled in.
-    static let privacyPolicy = URL(string: "https://PLACEHOLDER.example/privacy/")!
-    static let support = URL(string: "https://PLACEHOLDER.example/support/")!
+    // BOTH MUST STAY REACHABLE for as long as the app is on sale. App Review
+    // opens the privacy link from the paywall and the support link from App Store
+    // Connect, so a dead host is a rejection rather than a broken link. These are
+    // not marketing pages that can be retired once the launch is over, and
+    // because they are compiled in, changing either address means a new build.
+    static let privacyPolicy = URL(string: "https://privacy.sproutly.page/")!
+    static let support = URL(string: "https://support.sproutly.page/")!
     // Apple's standard EULA, which is the default terms for any app that does
     // not supply its own.
     static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!

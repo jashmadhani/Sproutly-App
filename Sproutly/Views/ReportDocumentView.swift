@@ -19,6 +19,13 @@ struct ReportDocumentView: View {
         VStack(alignment: .leading, spacing: 20) {
             header
 
+            // Before the milestones: weight and length are the first things a
+            // pediatrician checks at a visit, and they were the thing this report
+            // could not answer.
+            if !report.growth.isEmpty {
+                growthBlock
+            }
+
             summary
 
             ForEach(report.sections) { section in
@@ -44,7 +51,7 @@ struct ReportDocumentView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Developmental Milestone Summary")
+            Text(report.growth.isEmpty ? "Developmental Milestone Summary" : "Growth and Development Summary")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.black)
 
@@ -67,6 +74,67 @@ struct ReportDocumentView: View {
                 .frame(height: 1)
                 .padding(.top, 6)
         }
+    }
+
+    private var growthBlock: some View {
+        let units = report.growthUnits
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Growth")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.black)
+
+            Text(report.growth.count == ReportBuilder.growthRowLimit
+                 ? "The \(ReportBuilder.growthRowLimit) most recent measurements saved by the family."
+                 : "Measurements saved by the family.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            // A Grid rather than stacks, so every value lines up under its heading
+            // whatever the width of a date in the parent's locale.
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                // Units live in each cell rather than the heading, because an
+                // imperial weight is two units at once ("16 lb 4 oz") and cannot
+                // be expressed as a single "(lb)" column heading.
+                GridRow {
+                    columnHeading("Date")
+                    columnHeading("Age")
+                    columnHeading("Weight")
+                    columnHeading("Length / height")
+                    columnHeading("Head")
+                }
+
+                ForEach(report.growth) { row in
+                    GridRow {
+                        cell(row.date.formatted(date: .abbreviated, time: .omitted))
+                        cell(row.ageText)
+                        cell(value(row.weightKg, .weight, units))
+                        cell(value(row.lengthCm, .length, units))
+                        cell(value(row.headCm, .head, units))
+                    }
+                }
+            }
+        }
+    }
+
+    private func columnHeading(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private func cell(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.black)
+            .monospacedDigit()
+    }
+
+    /// A value with its unit. An empty cell reads as a gap in the table; a dash
+    /// reads as "not measured".
+    private func value(_ metricValue: Double?, _ metric: GrowthMetric, _ units: GrowthUnitSystem) -> String {
+        guard let metricValue else { return "–" }
+        return units.formatted(metricValue, metric: metric)
     }
 
     private var summary: some View {
