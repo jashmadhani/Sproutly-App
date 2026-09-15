@@ -32,6 +32,7 @@ struct MilestonesView: View {
     private var milestones: [Milestone] { child.sortedMilestones }
     @Environment(ThemeManager.self) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var selectedFilter: MilestoneFilter = .thisStage
     @State private var expandedDomains: Set<String> = Set(MilestoneCategory.allCases.map(\.rawValue))
@@ -232,7 +233,17 @@ struct MilestonesView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top) {
+        // At accessibility sizes the title and the button cannot share a line. A
+        // render at the largest size split the title mid-word ("Milest" / "ones")
+        // and squeezed "Add moment" to one letter per line down half the screen.
+        // The button moves under the title instead, the same reflow FormRow and
+        // FeatureCardHeader use.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14))
+            : AnyLayout(HStackLayout(alignment: .top))
+
+        return layout {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Milestones")
                     .font(.sproutlyDisplay(30))
@@ -245,7 +256,7 @@ struct MilestonesView: View {
                     .foregroundStyle(theme.textSecondary)
             }
 
-            Spacer()
+            if !stacked { Spacer() }
 
             Button {
                 Task { @MainActor in
