@@ -2486,3 +2486,30 @@ final class PurchaseManagerTests: XCTestCase {
         XCTAssertEqual(PaywallReason.allFeatures.count, 6)
     }
 }
+
+// MARK: - Milestones header
+
+// Seen on a render at the largest text size: the title split mid-word
+// ("Milest" / "ones") and "Add moment" stacked one letter per line, because the
+// title and the button were forced onto one line. The header must reflow.
+final class MilestonesHeaderRegressionTests: XCTestCase {
+
+    func testHeaderReflowsAtAccessibilitySizes() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let text = try String(
+            contentsOf: root.appendingPathComponent("Sproutly/Views/MilestonesView.swift"),
+            encoding: .utf8
+        )
+
+        guard let start = text.range(of: "private var headerSection: some View"),
+              let end = text.range(of: "private var ageDescription", range: start.upperBound..<text.endIndex) else {
+            return XCTFail("headerSection not found")
+        }
+        let header = String(text[start.upperBound..<end.lowerBound])
+
+        XCTAssertTrue(header.contains("isAccessibilitySize"), "the header must check for accessibility sizes")
+        XCTAssertTrue(header.contains("VStackLayout"), "the header must stack at accessibility sizes")
+    }
+}
