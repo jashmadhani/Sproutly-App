@@ -215,6 +215,13 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
     /// Sixteen or more ounces. Said separately, because "check the weight" does
     /// not tell a parent which of the two weight fields is wrong.
     case ouncesOutOfRange
+    /// The ounces text cannot be read. Separate from `.unreadable(.weight)` so
+    /// the ounces field is the one flagged and focused, not the pounds beside it.
+    case ouncesUnreadable
+    /// Decimal pounds typed alongside ounces ("16.5 lb 3 oz"). Its own case because
+    /// the generic unreadable message suggests "like 7.2", the very decimal that
+    /// was just refused.
+    case poundsNotWhole
 
     /// What a parent reads under the field. It talks about the number and the
     /// unit, never about the child — a mistyped value is not a finding.
@@ -228,6 +235,10 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
             return "Check the \(metric.phrase(ageMonths: ageMonths)). It doesn't look like a measurement in \(system.unitSymbol(for: metric))."
         case .ouncesOutOfRange:
             return "Check the ounces. They go up to 15, then the next pound starts."
+        case .ouncesUnreadable:
+            return "Those ounces aren't a number we can read. Use digits, like 4."
+        case .poundsNotWhole:
+            return "Use whole pounds when you add ounces, like 16 lb 3 oz."
         }
     }
 
@@ -236,7 +247,9 @@ enum GrowthEntryIssue: Error, Equatable, Sendable {
         case .nothingEntered:            return nil
         case .unreadable(let metric),
              .outOfRange(let metric):    return metric
-        case .ouncesOutOfRange:          return .weight
+        case .ouncesOutOfRange,
+             .ouncesUnreadable,
+             .poundsNotWhole:            return .weight
         }
     }
 }
@@ -280,13 +293,16 @@ enum GrowthEntryValidator {
                 if text.isEmpty {
                     pounds = 0
                 } else {
-                    guard let parsed = parse(text, locale: locale), parsed.rounded() == parsed else {
+                    guard let parsed = parse(text, locale: locale) else {
                         return .failure(.unreadable(.weight))
+                    }
+                    guard parsed.rounded() == parsed else {
+                        return .failure(.poundsNotWhole)
                     }
                     pounds = parsed
                 }
                 guard let ounces = parse(ounceText, locale: locale) else {
-                    return .failure(.unreadable(.weight))
+                    return .failure(.ouncesUnreadable)
                 }
                 guard ounces < 16 else { return .failure(.ouncesOutOfRange) }
                 typed = pounds + ounces / 16

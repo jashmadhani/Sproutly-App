@@ -88,7 +88,9 @@ struct GrowthChartView: View {
             AxisMarks(preset: .aligned, values: .automatic(desiredCount: tickCount)) { value in
                 AxisGridLine().foregroundStyle(theme.divider)
                 AxisValueLabel {
-                    if let months = value.as(Double.self) {
+                    // Whole months only. The two-month minimum window gets half-month
+                    // ticks, and rounding those printed "29, 30, 30, 30, 31".
+                    if let months = value.as(Double.self), months.rounded() == months {
                         Text(months.formatted(.number.precision(.fractionLength(0))))
                             .foregroundStyle(theme.textSecondary)
                     }
@@ -99,8 +101,11 @@ struct GrowthChartView: View {
             AxisMarks(preset: .aligned, position: .leading, values: .automatic(desiredCount: min(4, tickCount))) { value in
                 AxisGridLine().foregroundStyle(theme.divider)
                 AxisValueLabel {
+                    // Two decimals, matching what the app shows elsewhere. Two
+                    // weigh-ins close together get ticks a hundredth apart, which
+                    // one decimal would print as the same number repeated.
                     if let number = value.as(Double.self) {
-                        Text(number.formatted(.number.precision(.fractionLength(0...1))))
+                        Text(number.formatted(.number.precision(.fractionLength(0...2))))
                             .foregroundStyle(theme.textSecondary)
                     }
                 }

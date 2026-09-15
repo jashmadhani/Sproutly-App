@@ -251,7 +251,7 @@ struct AddMeasurementSheet: View {
                     unit: "lb",
                     prompt: "Optional",
                     field: .metric(.weight),
-                    isFlagged: issue == .unreadable(.weight) || issue == .outOfRange(.weight),
+                    isFlagged: issue == .unreadable(.weight) || issue == .outOfRange(.weight) || issue == .poundsNotWhole,
                     accessibilityLabel: "\(title), pounds"
                 )
                 unitInput(
@@ -259,7 +259,7 @@ struct AddMeasurementSheet: View {
                     unit: "oz",
                     prompt: "",
                     field: .ounces,
-                    isFlagged: issue == .ouncesOutOfRange,
+                    isFlagged: issue == .ouncesOutOfRange || issue == .ouncesUnreadable,
                     accessibilityLabel: "\(title), ounces"
                 )
             }
@@ -307,14 +307,32 @@ struct AddMeasurementSheet: View {
     // MARK: - Save
 
     private func save() {
-        let result = GrowthEntryValidator.validate(
-            weight: weight, weightOunces: weightOunces, length: length, head: head, system: system
+        // When editing, a field whose text was not touched is neither re-read nor
+        // re-checked. Its display text is rounded, and a stored value sitting on
+        // a range bound (28 cm head, shown as 11.02 in) re-reads just outside it,
+        // which blocked a note-only edit with "Check the head size".
+        let editing = existing != nil
+        let weightChanged = !editing || weight != initialText[0] || weightOunces != initialText[1]
+        let lengthChanged = !editing || length != initialText[2]
+        let headChanged = !editing || head != initialText[3]
+
+        var result = GrowthEntryValidator.validate(
+            weight: weightChanged ? weight : "",
+            weightOunces: weightChanged ? weightOunces : "",
+            length: lengthChanged ? length : "",
+            head: headChanged ? head : "",
+            system: system
         )
+        // Everything left after skipping untouched fields was empty. Save stays
+        // disabled with no value at all, so the untouched fields carry the entry.
+        if editing, case .failure(.nothingEntered) = result {
+            result = .success(GrowthValues())
+        }
 
         switch result {
         case .failure(let found):
             issue = found
-            if found == .ouncesOutOfRange {
+            if found == .ouncesOutOfRange || found == .ouncesUnreadable {
                 focused = .ounces
             } else if let metric = found.metric {
                 focused = .metric(metric)
@@ -327,12 +345,10 @@ struct AddMeasurementSheet: View {
                 // A value whose text was not touched keeps its stored precision.
                 // Only what the parent actually changed goes through the typed
                 // text, so correcting a note never nudges a weight.
-                let current = [weight, weightOunces, length, head]
-                let weightUnchanged = current[0] == initialText[0] && current[1] == initialText[1]
                 existing.date = date
-                existing.weightKg = weightUnchanged ? existing.weightKg : values.weightKg
-                existing.lengthCm = current[2] == initialText[2] ? existing.lengthCm : values.lengthCm
-                existing.headCm = current[3] == initialText[3] ? existing.headCm : values.headCm
+                existing.weightKg = weightChanged ? values.weightKg : existing.weightKg
+                existing.lengthCm = lengthChanged ? values.lengthCm : existing.lengthCm
+                existing.headCm = headChanged ? values.headCm : existing.headCm
                 existing.note = trimmedNote
             } else {
                 modelContext.insert(GrowthMeasurement(
