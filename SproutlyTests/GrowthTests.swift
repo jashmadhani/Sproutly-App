@@ -471,6 +471,23 @@ final class GrowthLayoutRegressionTests: XCTestCase {
         }
     }
 
+    // Fitted tightly to the data, a 250 g rise over three weeks filled the chart
+    // top to bottom on a render, so ordinary wobble looked like a spike. The value
+    // axis keeps a minimum span; wide data is left alone.
+    @MainActor
+    func testValueAxisNeverZoomsSmallChangesIntoSpikes() {
+        let tight = GrowthChartView.valueDomain(shown: [8.40, 8.65], metric: .weight, system: .metric)
+        XCTAssertGreaterThanOrEqual(tight.upperBound - tight.lowerBound, 1)
+        XCTAssertTrue(tight.contains(8.40) && tight.contains(8.65))
+
+        let wide = GrowthChartView.valueDomain(shown: [5.1, 8.6], metric: .weight, system: .metric)
+        XCTAssertTrue(wide.contains(5.1) && wide.contains(8.6))
+        XCTAssertLessThan(wide.upperBound - wide.lowerBound, 5)
+
+        // Never below zero, even for a tiny first value.
+        XCTAssertGreaterThanOrEqual(GrowthChartView.valueDomain(shown: [0.2], metric: .head, system: .imperial).lowerBound, 0)
+    }
+
     // Three segments on one line split "Weight" into "Weig" / "ht" at the
     // largest text size. The shared control must reflow, which also covers the
     // Milestones filter that uses it.

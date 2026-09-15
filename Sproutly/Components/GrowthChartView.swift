@@ -77,9 +77,12 @@ struct GrowthChartView: View {
             .accessibilityLabel(point.date.formatted(date: .abbreviated, time: .omitted))
             .accessibilityValue(system.formatted(point.value, metric: metric))
         }
-        // Not from zero. A weight line drawn from 0 kg flattens six months of real
-        // change into a nearly level line, which reads as "not growing".
-        .chartYScale(domain: .automatic(includesZero: false))
+        // Not from zero, and not shrunk to fit either. From zero, a weight line
+        // flattens six months of change into a level line that reads as "not
+        // growing". Fitted tightly to the data, a 250 g rise over three weeks filled
+        // the whole chart top to bottom on a render, so ordinary day-to-day wobble
+        // would look like a spike or a plunge. `yDomain` keeps a minimum span.
+        .chartYScale(domain: yDomain)
         .chartXScale(domain: xDomain)
         .chartXAxis {
             // `.aligned` pulls the first and last labels inside the plot. Centred
@@ -113,6 +116,42 @@ struct GrowthChartView: View {
         }
         .frame(height: min(height, 380))
         .accessibilityLabel("\(metric.title(ageMonths: Int(points.last?.ageMonths ?? 0))) over time")
+    }
+
+    /// The value axis, in the units shown, never narrower than a span where normal
+    /// variation stays visually small: about a kilogram (two pounds) of weight,
+    /// four centimetres (an inch and a half) of length, two centimetres (an inch)
+    /// of head size. Wider data gets a tenth of its span as margin either side.
+    private var yDomain: ClosedRange<Double> {
+        GrowthChartView.valueDomain(
+            shown: points.map { system.fromMetric($0.value, metric: metric) },
+            metric: metric,
+            system: system
+        )
+    }
+
+    static func valueDomain(shown: [Double], metric: GrowthMetric, system: GrowthUnitSystem) -> ClosedRange<Double> {
+        guard let low = shown.min(), let high = shown.max() else { return 0...1 }
+
+        let minimumSpan = GrowthChartView.minimumSpan(metric: metric, system: system)
+        let span = high - low
+        guard span < minimumSpan else {
+            return max(0, low - span * 0.1)...(high + span * 0.1)
+        }
+        let centre = (low + high) / 2
+        let lower = max(0, centre - minimumSpan / 2)
+        return lower...(lower + minimumSpan)
+    }
+
+    static func minimumSpan(metric: GrowthMetric, system: GrowthUnitSystem) -> Double {
+        switch (metric, system) {
+        case (.weight, .metric):   return 1
+        case (.weight, .imperial): return 2
+        case (.length, .metric):   return 4
+        case (.length, .imperial): return 1.5
+        case (.head, .metric):     return 2
+        case (.head, .imperial):   return 1
+        }
     }
 
     /// A single measurement still needs a readable axis, and two taken a week
