@@ -174,12 +174,22 @@ final class GrowthEntryValidatorTests: XCTestCase {
         )
     }
 
-    // "16.5 lb 3 oz" could mean two different weights, so it is not guessed at.
-    func testDecimalPoundsCombinedWithOuncesIsUnreadable() {
+    // Unreadable ounces are reported as ounces, so the sheet flags that field and
+    // not the correct pounds beside it.
+    func testUnreadableOuncesPointAtTheOuncesField() {
         XCTAssertEqual(
-            GrowthEntryValidator.validate(weight: "16.5", weightOunces: "3", length: "", head: "", system: .imperial, locale: us).issue,
-            .unreadable(.weight)
+            GrowthEntryValidator.validate(weight: "16", weightOunces: "4..5", length: "", head: "", system: .imperial, locale: us).issue,
+            .ouncesUnreadable
         )
+    }
+
+    // "16.5 lb 3 oz" could mean two different weights, so it is not guessed at.
+    // It gets its own issue: the generic "use digits, like 7.2" suggested exactly
+    // the decimal that was just rejected.
+    func testDecimalPoundsCombinedWithOuncesAsksForWholePounds() {
+        let issue = GrowthEntryValidator.validate(weight: "16.5", weightOunces: "3", length: "", head: "", system: .imperial, locale: us).issue
+        XCTAssertEqual(issue, .poundsNotWhole)
+        XCTAssertFalse(issue?.message(system: .imperial, ageMonths: 6).contains("7.2") ?? true)
     }
 
     // Metric has no ounces field; a stale value from a unit switch is ignored.
@@ -213,7 +223,8 @@ final class GrowthEntryValidatorTests: XCTestCase {
     func testIssueMessagesPointAtTheNumberNotTheChild() {
         let banned = ["too small", "too big", "underweight", "overweight", "concern", "worry", "abnormal"]
         let issues: [GrowthEntryIssue] = [.nothingEntered, .unreadable(.weight), .outOfRange(.weight),
-                                          .outOfRange(.length), .outOfRange(.head), .ouncesOutOfRange]
+                                          .outOfRange(.length), .outOfRange(.head), .ouncesOutOfRange,
+                                          .ouncesUnreadable, .poundsNotWhole]
 
         for issue in issues {
             for system in [GrowthUnitSystem.metric, .imperial] {
