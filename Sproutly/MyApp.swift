@@ -157,6 +157,37 @@ private func pruneOldArchives(in directory: URL) {
     }
 }
 
+// Removes every archived store and photo folder.
+//
+// `archiveExistingStore` moves data aside at the filesystem level, which is below
+// SwiftData and therefore below `ChildStore.delete`'s cascade. "Delete All Data"
+// walks the live object graph, so an archive is invisible to it: a parent could
+// wipe the app and leave behind a complete copy of every child's name, birth date,
+// milestones, notes and photos. The privacy policy says neither delete action
+// leaves a copy behind, so erasing has to happen at the level the copy was made at.
+//
+// Prefixes are the ones `archiveExistingStore` writes and `pruneOldArchives` reads.
+func deleteStoreArchives() {
+    let fileManager = FileManager.default
+    guard let appSupport = fileManager
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+
+    // Same no-prefetch reasoning as pruneOldArchives: asking for a resource key here
+    // would put the app in Apple's File Timestamp required-reason category.
+    guard let entries = try? fileManager.contentsOfDirectory(
+        at: appSupport,
+        includingPropertiesForKeys: nil
+    ) else { return }
+
+    for entry in entries {
+        let name = entry.lastPathComponent
+        guard name.hasPrefix("SproutlyDB-backup-") || name.hasPrefix("MilestonePhotos-backup-") else {
+            continue
+        }
+        try? fileManager.removeItem(at: entry)
+    }
+}
+
 // MARK: - App Entry Point
 
 @main

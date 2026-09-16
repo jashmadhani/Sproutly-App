@@ -36,6 +36,20 @@ enum PhotoStore {
             resourceValues.isExcludedFromBackup = false
             var mutable = folder
             try? mutable.setResourceValues(resourceValues)
+
+            // These are photographs of a child. The iOS default is
+            // CompleteUntilFirstUserAuthentication, which decrypts once after boot
+            // and stays readable while the device is locked. Nothing here needs disk
+            // access under lock — the app declares no background modes, and the
+            // anniversary photo is read in the foreground at schedule time — so the
+            // stricter class costs nothing. Set on the directory, so files created in
+            // it inherit it. Done programmatically rather than through
+            // com.apple.developer.default-data-protection, which needs a capability
+            // enabled on a real App ID.
+            try? FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.complete],
+                ofItemAtPath: folder.path
+            )
         }
 
         return folder

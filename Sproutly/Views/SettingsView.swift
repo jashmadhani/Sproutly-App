@@ -946,6 +946,14 @@ struct SettingsView: View {
         MilestoneLogCounter.reset()
         MilestonePhotoPicker.resetHint()
 
+        // The store-recovery path archives the previous store and the whole photo
+        // folder beside the live ones. Those sit below SwiftData, so the cascade
+        // above never reaches them and a wipe would leave a full readable copy of
+        // every child behind. Rendered files are swept for the same reason: a crash
+        // mid-share can strand a PDF carrying a child's name in tmp/SharedRenders.
+        deleteStoreArchives()
+        ShareRenderer.clearRenderedFiles()
+
         LegacyProfile.clear()
         childStore.refresh()
     }

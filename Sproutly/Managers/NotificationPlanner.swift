@@ -314,18 +314,20 @@ enum NotificationPlanner {
               let fire = time(anniversaryHour, anniversaryMinute, on: day, calendar: calendar)
         else { return nil }
 
-        // A sentence, not "Name — Thing." Catalog titles start capitalised
-        // because they head a row; lowercased here they read as the rest of a
-        // sentence about the child rather than a label with a value attached.
-        let action = milestone.title.prefix(1).lowercased() + milestone.title.dropFirst()
-
+        // Same rule as the daily notice above, and for the same reason. The child's
+        // name, the milestone and the photo are exactly what a stranger must not read
+        // over a shoulder at 10:30 on a locked phone, and a milestone title is a
+        // clinical screening item: "Aanya responds to own name" is a dated statement
+        // about a named child's development. iOS only hides this when Show Previews
+        // is not "Always", which the app cannot read or control — so the only control
+        // it has is what it puts in the content. All three live behind the tap.
         return PlannedNotification(
             kind: .anniversary,
             childID: childID,
             fireDate: fire,
             title: years == 1 ? "One year ago today" : "Two years ago today",
-            body: "\(childName) \(action).",
-            photoFilename: milestone.photoFilename
+            body: "A moment from back then is waiting for you.",
+            photoFilename: nil
         )
     }
 

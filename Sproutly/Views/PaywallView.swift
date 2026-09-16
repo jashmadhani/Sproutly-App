@@ -301,8 +301,12 @@ enum AppLinks {
     // Connect, so a dead host is a rejection rather than a broken link. These are
     // not marketing pages that can be retired once the launch is over, and
     // because they are compiled in, changing either address means a new build.
-    static let privacyPolicy = URL(string: "https://privacy.sproutly.page/")!
-    static let support = URL(string: "https://support.sproutly.page/")!
+    // Paths on the apex, not subdomains. privacy.sproutly.page and
+    // support.sproutly.page were never in DNS — both resolved to nothing, so the
+    // paywall's privacy link was dead for every user and would have failed review
+    // on the first attempt. The pages themselves have always been at these paths.
+    static let privacyPolicy = URL(string: "https://sproutly.page/privacy/")!
+    static let support = URL(string: "https://sproutly.page/support/")!
     // Apple's standard EULA, which is the default terms for any app that does
     // not supply its own.
     static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
