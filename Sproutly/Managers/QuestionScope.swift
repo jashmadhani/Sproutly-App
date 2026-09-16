@@ -104,10 +104,26 @@ enum ScopeDetector {
         let matchedTerm: String?
     }
 
+    /// The term lists above, reduced by `QuestionParser.stem`, so "vomiting"
+    /// reaches "vomit" and "seizures" reaches "seizure" without either list
+    /// having to spell the inflections out.
+    static let urgentSingleStems: Set<String> = Set(urgentSingleTerms.map(QuestionParser.stem))
+    static let urgentPairStems: [(Set<String>, Set<String>)] = urgentPairs.map {
+        (Set($0.0.map(QuestionParser.stem)), Set($0.1.map(QuestionParser.stem)))
+    }
+    static let healthStems: Set<String> = Set(healthTerms.map(QuestionParser.stem))
+    static let parentingStems: Set<String> = Set(parentingTerms.map(QuestionParser.stem))
+
     static func detect(tokens: [QuestionParser.Token], hasDomain: Bool) -> Result {
         let surfaces = Set(tokens.map(\.surface))
-        let lemmas = Set(tokens.map(\.lemma))
-        let all = surfaces.union(lemmas)
+        let stems = Set(tokens.map(\.stem))
+        let all = surfaces
+
+        /// The parent's own word for a stem that matched, because `matchedTerm`
+        /// is read back to them in the answer and a stem is not a word.
+        func spoken(for stem: String) -> String {
+            tokens.first { $0.stem == stem }?.surface ?? stem
+        }
 
         // Urgent wins outright, including over a developmental match. A question
         // that mentions both walking and blood in a nappy is not a walking
@@ -115,10 +131,19 @@ enum ScopeDetector {
         for term in urgentSingleTerms where all.contains(term) {
             return Result(scope: .urgentHealthSymptom, matchedTerm: term)
         }
+        for term in urgentSingleStems where stems.contains(term) {
+            return Result(scope: .urgentHealthSymptom, matchedTerm: spoken(for: term))
+        }
         for (subjects, qualifiers) in urgentPairs {
             if let subject = subjects.first(where: { all.contains($0) }),
                !qualifiers.isDisjoint(with: all) {
                 return Result(scope: .urgentHealthSymptom, matchedTerm: subject)
+            }
+        }
+        for (subjects, qualifiers) in urgentPairStems {
+            if let subject = subjects.first(where: { stems.contains($0) }),
+               !qualifiers.isDisjoint(with: stems) {
+                return Result(scope: .urgentHealthSymptom, matchedTerm: spoken(for: subject))
             }
         }
 
@@ -128,10 +153,10 @@ enum ScopeDetector {
         // mention food.
         if hasDomain { return Result(scope: .developmental, matchedTerm: nil) }
 
-        if let term = firstMatch(in: healthTerms, from: tokens) {
+        if let term = firstMatch(in: healthTerms, stems: healthStems, from: tokens) {
             return Result(scope: .healthSymptom, matchedTerm: term)
         }
-        if let term = firstMatch(in: parentingTerms, from: tokens) {
+        if let term = firstMatch(in: parentingTerms, stems: parentingStems, from: tokens) {
             return Result(scope: .parentingTopic, matchedTerm: term)
         }
         return Result(scope: .unclear, matchedTerm: nil)
@@ -139,10 +164,16 @@ enum ScopeDetector {
 
     /// First in the order the parent wrote them, so the named subject is the one
     /// they led with.
-    private static func firstMatch(in set: Set<String>, from tokens: [QuestionParser.Token]) -> String? {
+    private static func firstMatch(
+        in set: Set<String>,
+        stems: Set<String>,
+        from tokens: [QuestionParser.Token]
+    ) -> String? {
         for token in tokens {
-            if set.contains(token.lemma) { return token.lemma }
             if set.contains(token.surface) { return token.surface }
+            // A stem match names the parent's own word back to them, never the
+            // stem, which is a lookup key and not English.
+            if stems.contains(token.stem) { return token.surface }
         }
         return nil
     }

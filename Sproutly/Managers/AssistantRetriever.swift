@@ -55,10 +55,13 @@ enum AssistantRetriever {
 
         if let cached = lemmaCache[text] { return cached }
 
+        // Stems, to match `AssistantIntent.lemmas`. Both sides of this comparison
+        // must be reduced by the same function or nothing lines up: the question
+        // says "walking", the catalog says "walks".
         let computed = Set(
             QuestionParser.tokenize(text)
-                .map(\.lemma)
-                .filter { !QuestionParser.stopwords.contains($0) && $0.count > 1 }
+                .map(\.stem)
+                .filter { !QuestionParser.stopwordStems.contains($0) && $0.count > 1 }
         )
         lemmaCache[text] = computed
         return computed
@@ -147,7 +150,7 @@ enum AssistantRetriever {
         milestones: [Milestone],
         excludedBands: Set<Int> = []
     ) -> MilestoneReference? {
-        guard !intent.lemmas.isEmpty, let domain = intent.topDomain else { return nil }
+        guard !intent.stems.isEmpty, let domain = intent.topDomain else { return nil }
 
         let scored: [(milestone: Milestone, hits: Int)] = milestones.compactMap { milestone in
             guard !milestone.isUserCreated,
@@ -159,7 +162,7 @@ enum AssistantRetriever {
             // almost any question, and a loose match here would misdate the
             // concept and fire a false contradiction.
             let titleLemmas = lemmas(for: milestone.title)
-            let hits = intent.lemmas.reduce(into: 0) { total, lemma in
+            let hits = intent.stems.reduce(into: 0) { total, lemma in
                 if titleLemmas.contains(lemma) { total += 1 }
             }
             return hits > 0 ? (milestone, hits) : nil
@@ -185,13 +188,13 @@ enum AssistantRetriever {
     /// parent asking about drop-off meltdowns should not be read a note about
     /// following routines just because both are Social-Emotional.
     static func isTopical(_ reference: MilestoneReference, intent: AssistantIntent) -> Bool {
-        guard !intent.lemmas.isEmpty else { return false }
+        guard !intent.stems.isEmpty else { return false }
         // The title only. A tip is written prose ("Helping tidy up or coming for
         // a bath when asked") whose everyday words match almost any question,
         // which is what let an answer about drop-off meltdowns quote a note
         // about following routines.
         let titleLemmas = lemmas(for: reference.title)
-        return intent.lemmas.contains { titleLemmas.contains($0) }
+        return intent.stems.contains { titleLemmas.contains($0) }
     }
 
     private static func relevance(
@@ -234,7 +237,7 @@ enum AssistantRetriever {
         // Being about the same thing the question is about.
         let milestoneLemmas = lemmas(for: "\(milestone.title) \(milestone.tips)")
         var lexicalHits = 0
-        for lemma in intent.lemmas where milestoneLemmas.contains(lemma) {
+        for lemma in intent.stems where milestoneLemmas.contains(lemma) {
             lexicalHits += 1
         }
         let topicalScore = Double(lexicalHits) * 2.5

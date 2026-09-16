@@ -207,7 +207,7 @@ enum AssistantComposer {
     /// Stable across launches. `hashValue` is seeded per process and would give
     /// the same parent a different answer to the same question tomorrow.
     private static func deterministicSeed(for intent: AssistantIntent) -> Int {
-        let basis = intent.lemmas.sorted().joined(separator: " ")
+        let basis = intent.stems.sorted().joined(separator: " ")
         var hash = 5381
         for byte in basis.utf8 {
             hash = ((hash << 5) &+ hash) &+ Int(byte)
