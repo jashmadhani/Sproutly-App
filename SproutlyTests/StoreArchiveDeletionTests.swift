@@ -142,14 +142,21 @@ final class StoreArchiveDeletionTests: XCTestCase {
         guard let end = remainder.range(of: "\n    }") else {
             return XCTFail("could not find the end of deleteAllData(); update this guard")
         }
-        let function = String(remainder[..<end.lowerBound])
+        // Comment lines are dropped before matching. A plain `contains` over the
+        // whole body passes when the call is commented out, which is the most likely
+        // way this regresses and was exactly what happened when this guard was first
+        // red-green checked.
+        let liveCode = String(remainder[..<end.lowerBound])
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
 
         XCTAssertTrue(
-            function.contains("deleteStoreArchives()"),
+            liveCode.contains("deleteStoreArchives()"),
             "deleteAllData() no longer sweeps store archives, so a wipe leaves a full copy of every child on disk"
         )
         XCTAssertTrue(
-            function.contains("ShareRenderer.clearRenderedFiles()"),
+            liveCode.contains("ShareRenderer.clearRenderedFiles()"),
             "deleteAllData() no longer sweeps rendered files, so a stranded report naming a child survives a wipe"
         )
     }

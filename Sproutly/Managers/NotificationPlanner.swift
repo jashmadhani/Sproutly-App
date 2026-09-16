@@ -310,7 +310,10 @@ enum NotificationPlanner {
             .sorted { $0.0.title < $1.0.title }
             .first
 
-        guard let (milestone, years) = match,
+        // The milestone itself is deliberately unused: it decides *whether* there is an
+        // anniversary today, and the sort keeps that choice deterministic, but none of
+        // it reaches the notification. See the note below.
+        guard let (_, years) = match,
               let fire = time(anniversaryHour, anniversaryMinute, on: day, calendar: calendar)
         else { return nil }
 
